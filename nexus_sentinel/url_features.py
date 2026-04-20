@@ -28,7 +28,7 @@ class UrlFeatures:
 
 
 def extract_url_features(url: str) -> UrlFeatures:
-    parsed = urlparse(url)
+    parsed = urlparse(url if "://" in url else f"//{url}")
     hostname = parsed.hostname or ""
     hostname_parts = [part for part in hostname.split(".") if part]
     subdomain_count = max(len(hostname_parts) - 2, 0)
