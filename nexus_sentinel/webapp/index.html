@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nexus Sentinel</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="layout">
+      <section class="intro">
+        <p class="eyebrow">Nexus Sentinel</p>
+        <h1>Analyze one URL. See the pattern behind it.</h1>
+        <p class="lede">
+          Scan a link, score the risk, and group matching attacks into campaigns.
+        </p>
+        <img
+          class="signal-image"
+          src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80"
+          alt="Security operations screens and network data"
+        >
+      </section>
+
+      <section class="workspace">
+        <form id="analyze-form" class="analyze-form">
+          <label for="url-input">URL to inspect</label>
+          <div class="input-row">
+            <input
+              id="url-input"
+              name="url"
+              type="text"
+              placeholder="https://example.com/login"
+              autocomplete="off"
+              required
+            >
+            <button type="submit">Analyze</button>
+          </div>
+        </form>
+
+        <section id="result" class="result-panel" aria-live="polite">
+          <p class="muted">No scan yet.</p>
+        </section>
+      </section>
+
+      <section class="campaigns-section">
+        <div class="section-heading">
+          <h2>Campaigns</h2>
+          <button id="refresh-campaigns" type="button" class="secondary">
+            Refresh
+          </button>
+        </div>
+        <div id="campaigns" class="campaigns-list">
+          <p class="muted">No campaign data yet.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
