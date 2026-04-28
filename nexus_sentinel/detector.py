@@ -51,6 +51,22 @@ def _score_features(features: UrlFeatures) -> tuple[int, list[str]]:
         score += 10
         factors.append("URL has many subdomains")
 
+    if features.hostname_hyphen_count >= 2:
+        score += 8
+        factors.append("Hostname uses many hyphens")
+
+    if features.path_depth >= 4:
+        score += 6
+        factors.append("URL path is unusually deep")
+
+    if features.has_encoded_characters:
+        score += 6
+        factors.append("URL contains encoded characters")
+
+    if features.has_suspicious_tld:
+        score += 10
+        factors.append("URL uses a high-risk top-level domain")
+
     if features.suspicious_keywords:
         score += min(len(features.suspicious_keywords) * 8, 24)
         factors.append(
