@@ -1,4 +1,5 @@
 import json
+import socket
 from pathlib import Path
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
@@ -8,6 +9,8 @@ from nexus_sentinel.service import AnalysisService
 
 ASSET_DIR = Path(__file__).parent / "webapp"
 DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.json"
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 9010
 
 
 class DashboardApp:
@@ -82,9 +85,19 @@ class DashboardApp:
 
 def main() -> None:
     app = DashboardApp(storage_path=DEFAULT_STORAGE_PATH)
-    with make_server("127.0.0.1", 8000, app) as server:
-        print("Nexus Sentinel dashboard running on http://127.0.0.1:8000")
+    host, port = _pick_available_address(DEFAULT_HOST, DEFAULT_PORT)
+    with make_server(host, port, app) as server:
+        print(f"Nexus Sentinel dashboard running on http://{host}:{port}")
         server.serve_forever()
+
+
+def _pick_available_address(host: str, starting_port: int) -> tuple[str, int]:
+    for port in range(starting_port, starting_port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            if sock.connect_ex((host, port)) != 0:
+                return host, port
+    raise RuntimeError("No open port found between 9010 and 9029.")
 
 
 if __name__ == "__main__":

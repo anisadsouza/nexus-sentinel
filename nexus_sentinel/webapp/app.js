@@ -37,37 +37,43 @@ refreshButton.addEventListener("click", () => {
 });
 
 async function loadCampaigns() {
-  const response = await fetch("/api/campaigns");
-  const data = await response.json();
+  try {
+    const response = await fetch("/api/campaigns");
+    const data = await response.json();
 
-  if (!response.ok) {
-    throw new Error(data.error || "Could not load campaigns.");
+    if (!response.ok) {
+      throw new Error(data.error || "Could not load campaigns.");
+    }
+
+    if (!data.campaigns.length) {
+      campaigns.innerHTML = '<p class="muted">No campaign data yet.</p>';
+    } else {
+      campaigns.innerHTML = data.campaigns
+        .map(
+          (campaign) => `
+            <article class="campaign-item">
+              <div class="campaign-topline">
+                <h3>${campaign.campaign_id}</h3>
+                <span class="badge ${statusClass(campaign.classification)}">${campaign.classification}</span>
+              </div>
+              <p class="campaign-meta">Fingerprint: ${campaign.threat_fingerprint_id}</p>
+              <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
+              <ul>
+                ${campaign.example_urls.map((url) => `<li>${url}</li>`).join("")}
+              </ul>
+            </article>
+          `
+        )
+        .join("");
+    }
+
+    renderRecentScans(data.recent_scans);
+    renderOverview(data.recent_scans, data.campaigns);
+  } catch (error) {
+    campaigns.innerHTML = `<p class="error">${error.message}</p>`;
+    recentScans.innerHTML = '<p class="muted">Recent scans unavailable.</p>';
+    renderOverview([], []);
   }
-
-  if (!data.campaigns.length) {
-    campaigns.innerHTML = '<p class="muted">No campaign data yet.</p>';
-  } else {
-    campaigns.innerHTML = data.campaigns
-      .map(
-        (campaign) => `
-          <article class="campaign-item">
-            <div class="campaign-topline">
-              <h3>${campaign.campaign_id}</h3>
-              <span class="badge ${statusClass(campaign.classification)}">${campaign.classification}</span>
-            </div>
-            <p class="campaign-meta">Fingerprint: ${campaign.threat_fingerprint_id}</p>
-            <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
-            <ul>
-              ${campaign.example_urls.map((url) => `<li>${url}</li>`).join("")}
-            </ul>
-          </article>
-        `
-      )
-      .join("");
-  }
-
-  renderRecentScans(data.recent_scans);
-  renderOverview(data.recent_scans, data.campaigns);
 }
 
 function renderResult(data) {
