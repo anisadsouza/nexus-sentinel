@@ -42,6 +42,17 @@ body {
   padding: 20px;
 }
 
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  gap: 24px;
+}
+
+.recent-section,
+.campaigns-section {
+  padding: 8px 0;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   color: var(--accent-strong);
@@ -78,6 +89,20 @@ h1 {
 .analyze-form {
   display: grid;
   gap: 12px;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.overview-item {
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .input-row {
@@ -119,6 +144,14 @@ button.secondary {
   border-radius: 8px;
 }
 
+.result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
 .result-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -142,6 +175,16 @@ button.secondary {
   font-size: 1rem;
 }
 
+.result-url,
+.recent-url {
+  overflow-wrap: anywhere;
+}
+
+.result-url {
+  font-size: 1.1rem;
+  margin-bottom: 0;
+}
+
 .section-heading,
 .campaign-topline {
   display: flex;
@@ -155,10 +198,28 @@ button.secondary {
   gap: 12px;
 }
 
+.recent-list {
+  display: grid;
+  gap: 12px;
+}
+
+.recent-item,
 .campaign-item {
   padding: 16px;
   background: var(--surface-alt);
   border-radius: 8px;
+}
+
+.campaign-meta,
+.recent-meta {
+  color: var(--muted);
+}
+
+.recent-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 .badge {
@@ -169,6 +230,27 @@ button.secondary {
   border-radius: 8px;
   background: var(--surface);
   border: 1px solid var(--border);
+}
+
+.badge.large {
+  min-height: 36px;
+  font-size: 15px;
+}
+
+.status-safe {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.status-suspicious {
+  background: #fef3c7;
+  border-color: #fcd34d;
+}
+
+.status-phishing {
+  color: white;
+  background: #b91c1c;
+  border-color: #991b1b;
 }
 
 .error {
@@ -185,8 +267,14 @@ ul {
     font-size: 2rem;
   }
 
+  .dashboard-grid,
+  .overview-grid,
   .input-row,
   .result-grid {
     grid-template-columns: 1fr;
+  }
+
+  .result-header {
+    flex-direction: column;
   }
 }

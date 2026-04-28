@@ -37,12 +37,37 @@
           </div>
         </form>
 
+        <section id="overview" class="overview-grid" aria-live="polite">
+          <article class="overview-item">
+            <p class="metric-label">Total Scans</p>
+            <p id="total-scans" class="metric-value">0</p>
+          </article>
+          <article class="overview-item">
+            <p class="metric-label">Active Campaigns</p>
+            <p id="active-campaigns" class="metric-value">0</p>
+          </article>
+          <article class="overview-item">
+            <p class="metric-label">Highest Risk</p>
+            <p id="highest-risk" class="metric-value">0</p>
+          </article>
+        </section>
+
         <section id="result" class="result-panel" aria-live="polite">
           <p class="muted">No scan yet.</p>
         </section>
       </section>
 
-      <section class="campaigns-section">
+      <section class="dashboard-grid">
+        <section class="recent-section">
+          <div class="section-heading">
+            <h2>Recent Scans</h2>
+          </div>
+          <div id="recent-scans" class="recent-list">
+            <p class="muted">No recent scans yet.</p>
+          </div>
+        </section>
+
+        <section class="campaigns-section">
         <div class="section-heading">
           <h2>Campaigns</h2>
           <button id="refresh-campaigns" type="button" class="secondary">
@@ -52,6 +77,7 @@
         <div id="campaigns" class="campaigns-list">
           <p class="muted">No campaign data yet.</p>
         </div>
+        </section>
       </section>
     </main>
 
