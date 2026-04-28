@@ -22,5 +22,8 @@ build/
 dist/
 *.egg-info/
 
+# Runtime data
+data/*.json
+
 # macOS
 .DS_Store

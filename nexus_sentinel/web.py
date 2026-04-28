@@ -7,11 +7,12 @@ from nexus_sentinel.service import AnalysisService
 
 
 ASSET_DIR = Path(__file__).parent / "webapp"
+DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.json"
 
 
 class DashboardApp:
-    def __init__(self) -> None:
-        self._service = AnalysisService()
+    def __init__(self, storage_path: str | Path | None = None) -> None:
+        self._service = AnalysisService(storage_path=storage_path)
 
     def __call__(self, environ: dict, start_response) -> list[bytes]:
         path = environ.get("PATH_INFO", "/")
@@ -80,7 +81,7 @@ class DashboardApp:
 
 
 def main() -> None:
-    app = DashboardApp()
+    app = DashboardApp(storage_path=DEFAULT_STORAGE_PATH)
     with make_server("127.0.0.1", 8000, app) as server:
         print("Nexus Sentinel dashboard running on http://127.0.0.1:8000")
         server.serve_forever()

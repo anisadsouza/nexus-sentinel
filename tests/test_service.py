@@ -1,3 +1,5 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import unittest
 
 from nexus_sentinel.service import AnalysisService
@@ -33,6 +35,20 @@ class AnalysisServiceTests(unittest.TestCase):
 
         self.assertEqual(scans[0]["url"], latest.url)
         self.assertEqual(scans[0]["classification"], latest.classification)
+
+    def test_records_persist_when_storage_path_is_used(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            storage_path = Path(tmp_dir) / "history.json"
+            first_service = AnalysisService(storage_path=storage_path)
+
+            saved = first_service.analyze("http://192.168.1.5/login")
+
+            second_service = AnalysisService(storage_path=storage_path)
+            scans = second_service.recent_scans()
+
+            self.assertEqual(len(scans), 1)
+            self.assertEqual(scans[0]["url"], saved.url)
+            self.assertEqual(scans[0]["campaign_id"], saved.campaign_id)
 
 
 if __name__ == "__main__":

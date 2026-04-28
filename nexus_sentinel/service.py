@@ -1,4 +1,6 @@
+import json
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from nexus_sentinel.detector import analyze_url
 
@@ -18,8 +20,9 @@ class AnalysisRecord:
 
 
 class AnalysisService:
-    def __init__(self) -> None:
-        self._records: list[AnalysisRecord] = []
+    def __init__(self, storage_path: str | Path | None = None) -> None:
+        self._storage_path = Path(storage_path) if storage_path else None
+        self._records = self._load_records()
 
     def analyze(self, url: str) -> AnalysisRecord:
         detection = analyze_url(url)
@@ -38,6 +41,7 @@ class AnalysisService:
             campaign_size=campaign_size,
         )
         self._records.append(record)
+        self._save_records()
         return record
 
     def list_campaigns(self) -> list[dict[str, object]]:
@@ -66,6 +70,35 @@ class AnalysisService:
 
     def recent_scans(self, limit: int = 10) -> list[dict[str, object]]:
         return [record.to_dict() for record in reversed(self._records[-limit:])]
+
+    def _load_records(self) -> list[AnalysisRecord]:
+        if not self._storage_path or not self._storage_path.exists():
+            return []
+
+        payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
+        return [
+            AnalysisRecord(
+                url=item["url"],
+                risk_score=item["risk_score"],
+                classification=item["classification"],
+                risk_factors=tuple(item["risk_factors"]),
+                threat_fingerprint_id=item["threat_fingerprint_id"],
+                campaign_id=item["campaign_id"],
+                campaign_size=item["campaign_size"],
+            )
+            for item in payload
+        ]
+
+    def _save_records(self) -> None:
+        if not self._storage_path:
+            return
+
+        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
+        serialized = [record.to_dict() for record in self._records]
+        self._storage_path.write_text(
+            json.dumps(serialized, indent=2),
+            encoding="utf-8",
+        )
 
 
 def _campaign_id_for(threat_fingerprint_id: str) -> str:
