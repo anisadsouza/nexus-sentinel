@@ -98,19 +98,18 @@ async function loadCampaigns() {
           (campaign) => `
             <article class="campaign-item">
               <div class="campaign-topline">
-                <h3>${campaign.campaign_id}</h3>
-                <span class="badge ${statusClass(campaign.classification)}">${campaign.classification}</span>
+                <p class="campaign-id">${campaign.campaign_id}</p>
+                <span class="risk-pill ${statusClass(campaign.classification)}">${sentenceCase(campaign.classification)}</span>
               </div>
-              <p class="campaign-meta">Fingerprint: ${campaign.threat_fingerprint_id}</p>
               <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
-              <p class="campaign-meta">Common signals: ${
-                campaign.common_risk_factors.length
-                  ? campaign.common_risk_factors.join(" | ")
-                  : "No repeated factors yet"
-              }</p>
-              <ul>
-                ${campaign.example_urls.map((url) => `<li>${url}</li>`).join("")}
-              </ul>
+              <div class="signal-pill-row">
+                ${renderCampaignSignals(campaign)}
+              </div>
+              <div class="url-pill-row">
+                ${campaign.example_urls
+                  .map((url) => `<span class="url-pill">${url}</span>`)
+                  .join("")}
+              </div>
             </article>
           `
         )
@@ -127,92 +126,52 @@ async function loadCampaigns() {
 }
 
 function renderResult(data) {
-  const factorItems = data.risk_factors.length
-    ? data.risk_factors.map((factor) => `<li>${factor}</li>`).join("")
-    : "<li>No major URL-level rules were triggered.</li>";
-  const features = data.extracted_features || {};
   const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
-  const featureItems = [
-    ["HTTPS", features.uses_https ? "Yes" : "No"],
-    ["Hostname", features.hostname || "Unknown"],
-    ["IP Hostname", features.is_ip_hostname ? "Yes" : "No"],
-    ["URL Length", features.url_length ?? "Unknown"],
-    ["Subdomains", features.subdomain_count ?? "Unknown"],
-    ["Hyphens in Hostname", features.hostname_hyphen_count ?? "Unknown"],
-    ["Path Depth", features.path_depth ?? "Unknown"],
-    ["Encoded Characters", features.has_encoded_characters ? "Yes" : "No"],
-    ["High-Risk TLD", features.has_suspicious_tld ? "Yes" : "No"],
-    ["Query Parameters", features.query_parameter_count ?? "Unknown"],
-    [
-      "Keywords",
-      Array.isArray(features.suspicious_keywords) && features.suspicious_keywords.length
-        ? features.suspicious_keywords.join(", ")
-        : "None",
-    ],
-  ]
-    .map(
-      ([label, value]) => `
-        <div class="feature-item">
-          <p class="metric-label">${label}</p>
-          <p class="feature-value">${value}</p>
-        </div>
-      `
-    )
-    .join("");
-  const scoreItems = scoreBreakdown.length
-    ? scoreBreakdown
-        .map(
-          (item) => `
-            <article class="score-item">
-              <div class="score-item-topline">
-                <p class="metric-label">${item.rule.replaceAll("_", " ")}</p>
-                <p class="score-points">+${item.points}</p>
-              </div>
-              <p class="score-reason">${item.reason}</p>
-            </article>
-          `
-        )
-        .join("")
-    : '<p class="muted">No risk rules were triggered.</p>';
+  const ringMetrics = buildRingMetrics(data.risk_score);
+  const verdictTone = verdictToneClass(data.classification);
+  const factorRows = buildFactorRows(data, scoreBreakdown);
 
   result.innerHTML = `
-    <div class="result-header">
-      <div>
-        <p class="metric-label">Last Scan</p>
-        <p class="result-url">${data.url}</p>
-        <p class="result-time">${formatTimestamp(data.analyzed_at)}</p>
+    <div class="result-shell">
+      <div class="score-column">
+        <p class="section-kicker">Risk Score</p>
+        <div class="gauge-wrap">
+          <svg class="score-gauge" viewBox="0 0 90 90" aria-hidden="true">
+            <circle class="gauge-track" cx="45" cy="45" r="36"></circle>
+            <circle
+              class="gauge-fill"
+              cx="45"
+              cy="45"
+              r="36"
+              stroke-dasharray="${ringMetrics.dashArray}"
+              stroke-dashoffset="${ringMetrics.dashOffset}"
+            ></circle>
+          </svg>
+          <div class="gauge-center">
+            <p class="gauge-score">${data.risk_score}</p>
+            <p class="gauge-total">/100</p>
+          </div>
+        </div>
       </div>
-      <span class="badge large ${statusClass(data.classification)}">${data.classification}</span>
-    </div>
-    <div class="result-grid">
-      <article class="overview-item">
-        <p class="metric-label">Risk Score</p>
-        <p class="metric-value">${data.risk_score}/100</p>
-      </article>
-      <article class="overview-item">
-        <p class="metric-label">Fingerprint</p>
-        <p class="metric-value small">${data.threat_fingerprint_id}</p>
-      </article>
-      <article class="overview-item">
-        <p class="metric-label">Campaign</p>
-        <p class="metric-value small">${data.campaign_id}</p>
-      </article>
-      <article class="overview-item">
-        <p class="metric-label">Campaign Size</p>
-        <p class="metric-value">${data.campaign_size}</p>
-      </article>
-    </div>
-    <div class="list-block">
-      <p class="metric-label">Risk Factors</p>
-      <ul>${factorItems}</ul>
-    </div>
-    <div class="list-block">
-      <p class="metric-label">Score Breakdown</p>
-      <div class="score-list">${scoreItems}</div>
-    </div>
-    <div class="list-block">
-      <p class="metric-label">Extracted Features</p>
-      <div class="feature-grid">${featureItems}</div>
+
+      <div class="verdict-column">
+        <p class="section-kicker">Verdict</p>
+        <div class="verdict-card ${verdictTone}">
+          <div class="verdict-icon">${verdictIcon(data.classification)}</div>
+          <div>
+            <p class="verdict-title">${sentenceCase(data.classification)}</p>
+            <p class="verdict-subtitle">
+              ${data.url}<br>${formatTimestamp(data.analyzed_at)}
+            </p>
+          </div>
+        </div>
+        <div class="factor-list">${factorRows}</div>
+        <div class="meta-strip">
+          <span class="meta-pill">${data.threat_fingerprint_id}</span>
+          <span class="meta-pill">${data.campaign_id}</span>
+          <span class="meta-pill">Campaign size ${data.campaign_size}</span>
+        </div>
+      </div>
     </div>
   `;
 }
@@ -229,14 +188,20 @@ function renderRecentScans(scans) {
     .map(
       (scan, index) => `
         <button type="button" class="recent-item" data-scan-index="${index}">
-          <div class="campaign-topline">
-            <p class="recent-url">${scan.url}</p>
-            <span class="badge ${statusClass(scan.classification)}">${scan.classification}</span>
+          <p class="recent-url">${scan.url}</p>
+          <div class="scan-progress">
+            <div
+              class="scan-progress-fill ${riskBarClass(scan.risk_score)}"
+              style="width: ${Math.max(4, scan.risk_score)}%;"
+            ></div>
           </div>
           <div class="recent-meta">
-            <span>Risk ${scan.risk_score}/100</span>
-            <span>${scan.campaign_id}</span>
+            <span class="risk-pill ${statusClass(scan.classification)}">${sentenceCase(scan.classification)}</span>
+            <span>${scan.risk_score}/100</span>
             <span>${formatTimestamp(scan.analyzed_at)}</span>
+          </div>
+          <div class="recent-meta subtle">
+            <span>${scan.campaign_id}</span>
           </div>
         </button>
       `
@@ -318,6 +283,89 @@ function applyTheme(theme) {
     "title",
     theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
   );
+}
+
+function buildRingMetrics(score) {
+  const dashArray = 226;
+  const normalizedScore = Math.max(0, Math.min(score, 100));
+  const dashOffset = dashArray - (normalizedScore / 100) * dashArray;
+  return { dashArray, dashOffset };
+}
+
+function buildFactorRows(data, scoreBreakdown) {
+  if (!scoreBreakdown.length) {
+    return `
+      <div class="factor-row">
+        <span class="factor-icon factor-good">✓</span>
+        <span class="factor-text">No major URL-level risks were triggered.</span>
+        <span class="factor-points">0</span>
+      </div>
+    `;
+  }
+
+  return scoreBreakdown
+    .map((item) => {
+      const toneClass = item.points >= 12 ? "factor-bad" : "factor-warn";
+      return `
+        <div class="factor-row">
+          <span class="factor-icon ${toneClass}">!</span>
+          <span class="factor-text">${item.reason}</span>
+          <span class="factor-points">+${item.points}</span>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function riskBarClass(score) {
+  if (score >= 70) {
+    return "bar-high";
+  }
+  if (score >= 35) {
+    return "bar-medium";
+  }
+  return "bar-safe";
+}
+
+function verdictToneClass(classification) {
+  if (classification === "phishing") {
+    return "verdict-high";
+  }
+  if (classification === "suspicious") {
+    return "verdict-medium";
+  }
+  return "verdict-safe";
+}
+
+function verdictIcon(classification) {
+  if (classification === "safe") {
+    return "✓";
+  }
+  return "⚠";
+}
+
+function sentenceCase(value) {
+  if (!value) {
+    return "";
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function renderCampaignSignals(campaign) {
+  const repeatedSignals = Array.isArray(campaign.common_risk_factors)
+    ? campaign.common_risk_factors
+    : [];
+
+  if (!repeatedSignals.length) {
+    return '<span class="signal-pill signal-good">Stable fingerprint</span>';
+  }
+
+  return repeatedSignals
+    .map((signal) => {
+      const tone = signal.toLowerCase().includes("https") ? "signal-good" : "signal-bad";
+      return `<span class="signal-pill ${tone}">${signal}</span>`;
+    })
+    .join("");
 }
 
 void loadCampaigns();

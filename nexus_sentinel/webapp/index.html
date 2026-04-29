@@ -7,36 +7,32 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <main class="layout">
-      <div class="topbar">
-        <p class="topbar-label">Nexus Sentinel Dashboard</p>
-        <button
-          id="theme-toggle"
-          type="button"
-          class="theme-toggle"
-          aria-label="Toggle color theme"
-          title="Toggle color theme"
-        >
-          <span id="theme-toggle-icon" aria-hidden="true">☾</span>
-        </button>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <p class="topbar-label">NEXUS SENTINEL</p>
+        <div class="topbar-actions">
+          <span class="status-dot" aria-label="System online"></span>
+          <button
+            id="theme-toggle"
+            type="button"
+            class="theme-toggle"
+            aria-label="Toggle color theme"
+            title="Toggle color theme"
+          >
+            <span id="theme-toggle-icon" aria-hidden="true">☾</span>
+          </button>
+        </div>
       </div>
+    </header>
 
+    <main class="layout">
       <section class="intro">
         <p class="eyebrow">Nexus Sentinel</p>
         <h1>Analyze one URL. See the pattern behind it.</h1>
         <p class="lede">
           Scan a link, score the risk, and group matching attacks into campaigns.
         </p>
-        <img
-          class="signal-image"
-          src="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80"
-          alt="Security operations screens and network data"
-        >
-      </section>
-
-      <section class="workspace">
         <form id="analyze-form" class="analyze-form">
-          <label for="url-input">URL to inspect</label>
           <div class="input-row">
             <input
               id="url-input"
@@ -85,7 +81,10 @@
       <section class="dashboard-grid">
         <section class="recent-section">
           <div class="section-heading">
-            <h2>Recent Scans</h2>
+            <div>
+              <p class="section-kicker">Recent Scans</p>
+              <h2>Recent Scans</h2>
+            </div>
           </div>
           <div id="recent-scans" class="recent-list">
             <p class="muted">No recent scans yet.</p>
@@ -93,15 +92,18 @@
         </section>
 
         <section class="campaigns-section">
-        <div class="section-heading">
-          <h2>Campaigns</h2>
-          <button id="refresh-campaigns" type="button" class="secondary">
-            Refresh
-          </button>
-        </div>
-        <div id="campaigns" class="campaigns-list">
-          <p class="muted">No campaign data yet.</p>
-        </div>
+          <div class="section-heading">
+            <div>
+              <p class="section-kicker">Campaigns</p>
+              <h2>Campaigns</h2>
+            </div>
+            <button id="refresh-campaigns" type="button" class="secondary">
+              Refresh
+            </button>
+          </div>
+          <div id="campaigns" class="campaigns-list">
+            <p class="muted">No campaign data yet.</p>
+          </div>
         </section>
       </section>
     </main>
