@@ -11,6 +11,7 @@ class DetectionResult:
     risk_factors: tuple[str, ...]
     threat_fingerprint_id: str
     extracted_features: dict[str, object]
+    score_breakdown: tuple[dict[str, object], ...]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -18,7 +19,7 @@ class DetectionResult:
 
 def analyze_url(url: str) -> DetectionResult:
     features = extract_url_features(url)
-    score, factors = _score_features(features)
+    score, factors, breakdown = _score_features(features)
 
     return DetectionResult(
         risk_score=score,
@@ -26,60 +27,110 @@ def analyze_url(url: str) -> DetectionResult:
         risk_factors=tuple(factors),
         threat_fingerprint_id=generate_threat_fingerprint(features),
         extracted_features=_serialize_features(features),
+        score_breakdown=tuple(breakdown),
     )
 
 
-def _score_features(features: UrlFeatures) -> tuple[int, list[str]]:
+def _score_features(
+    features: UrlFeatures,
+) -> tuple[int, list[str], list[dict[str, object]]]:
     score = 0
     factors: list[str] = []
+    breakdown: list[dict[str, object]] = []
 
-    if features.url_length >= 100:
-        score += 15
-        factors.append("URL is unusually long")
+    def add_rule(triggered: bool, points: int, label: str, reason: str) -> None:
+        nonlocal score
+        if triggered:
+            score += points
+            factors.append(reason)
+            breakdown.append({"rule": label, "points": points, "reason": reason})
 
-    if features.has_at_symbol:
-        score += 20
-        factors.append("URL contains @ symbol")
+    add_rule(
+        features.url_length >= 100,
+        15,
+        "long_url",
+        "URL is unusually long",
+    )
 
-    if not features.uses_https:
-        score += 12
-        factors.append("URL does not use HTTPS")
+    add_rule(
+        features.has_at_symbol,
+        20,
+        "at_symbol",
+        "URL contains @ symbol",
+    )
 
-    if features.is_ip_hostname:
-        score += 20
-        factors.append("Hostname is an IP address")
+    add_rule(
+        not features.uses_https,
+        12,
+        "no_https",
+        "URL does not use HTTPS",
+    )
 
-    if features.subdomain_count >= 3:
-        score += 10
-        factors.append("URL has many subdomains")
+    add_rule(
+        features.is_ip_hostname,
+        20,
+        "ip_hostname",
+        "Hostname is an IP address",
+    )
 
-    if features.hostname_hyphen_count >= 2:
-        score += 8
-        factors.append("Hostname uses many hyphens")
+    add_rule(
+        features.subdomain_count >= 3,
+        10,
+        "many_subdomains",
+        "URL has many subdomains",
+    )
 
-    if features.path_depth >= 4:
-        score += 6
-        factors.append("URL path is unusually deep")
+    add_rule(
+        features.hostname_hyphen_count >= 2,
+        8,
+        "many_hyphens",
+        "Hostname uses many hyphens",
+    )
 
-    if features.has_encoded_characters:
-        score += 6
-        factors.append("URL contains encoded characters")
+    add_rule(
+        features.path_depth >= 4,
+        6,
+        "deep_path",
+        "URL path is unusually deep",
+    )
 
-    if features.has_suspicious_tld:
-        score += 10
-        factors.append("URL uses a high-risk top-level domain")
+    add_rule(
+        features.has_encoded_characters,
+        6,
+        "encoded_characters",
+        "URL contains encoded characters",
+    )
+
+    add_rule(
+        features.has_suspicious_tld,
+        10,
+        "high_risk_tld",
+        "URL uses a high-risk top-level domain",
+    )
 
     if features.suspicious_keywords:
-        score += min(len(features.suspicious_keywords) * 8, 24)
-        factors.append(
-            "Suspicious keywords found: " + ", ".join(features.suspicious_keywords)
+        keyword_points = min(len(features.suspicious_keywords) * 8, 24)
+        keyword_reason = "Suspicious keywords found: " + ", ".join(
+            features.suspicious_keywords
+        )
+        score += keyword_points
+        factors.append(keyword_reason)
+        breakdown.append(
+            {
+                "rule": "suspicious_keywords",
+                "points": keyword_points,
+                "reason": keyword_reason,
+            }
         )
 
-    if features.query_parameter_count >= 5:
-        score += 8
-        factors.append("URL has many query parameters")
+    add_rule(
+        features.query_parameter_count >= 5,
+        8,
+        "many_query_parameters",
+        "URL has many query parameters",
+    )
 
-    return min(score, 100), factors
+    return min(score, 100), factors, breakdown
 
 
 def _classify(score: int) -> str:

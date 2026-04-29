@@ -271,6 +271,35 @@ button.secondary {
   gap: 12px;
 }
 
+.score-list {
+  display: grid;
+  gap: 12px;
+}
+
+.score-item {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.score-item-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.score-points {
+  margin-bottom: 0;
+  font-size: 1.1rem;
+}
+
+.score-reason {
+  margin-bottom: 0;
+  color: var(--muted);
+}
+
 .feature-item {
   padding: 14px;
   background: var(--surface);

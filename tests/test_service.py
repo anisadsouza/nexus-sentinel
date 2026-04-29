@@ -50,6 +50,7 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertEqual(scans[0]["url"], saved.url)
             self.assertEqual(scans[0]["campaign_id"], saved.campaign_id)
             self.assertIn("extracted_features", scans[0])
+            self.assertIn("score_breakdown", scans[0])
 
 
 if __name__ == "__main__":

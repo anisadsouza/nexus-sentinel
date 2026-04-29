@@ -95,6 +95,7 @@ function renderResult(data) {
     ? data.risk_factors.map((factor) => `<li>${factor}</li>`).join("")
     : "<li>No major URL-level rules were triggered.</li>";
   const features = data.extracted_features || {};
+  const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
   const featureItems = [
     ["HTTPS", features.uses_https ? "Yes" : "No"],
     ["Hostname", features.hostname || "Unknown"],
@@ -122,6 +123,21 @@ function renderResult(data) {
       `
     )
     .join("");
+  const scoreItems = scoreBreakdown.length
+    ? scoreBreakdown
+        .map(
+          (item) => `
+            <article class="score-item">
+              <div class="score-item-topline">
+                <p class="metric-label">${item.rule.replaceAll("_", " ")}</p>
+                <p class="score-points">+${item.points}</p>
+              </div>
+              <p class="score-reason">${item.reason}</p>
+            </article>
+          `
+        )
+        .join("")
+    : '<p class="muted">No risk rules were triggered.</p>';
 
   result.innerHTML = `
     <div class="result-header">
@@ -152,6 +168,10 @@ function renderResult(data) {
     <div class="list-block">
       <p class="metric-label">Risk Factors</p>
       <ul>${factorItems}</ul>
+    </div>
+    <div class="list-block">
+      <p class="metric-label">Score Breakdown</p>
+      <div class="score-list">${scoreItems}</div>
     </div>
     <div class="list-block">
       <p class="metric-label">Extracted Features</p>
