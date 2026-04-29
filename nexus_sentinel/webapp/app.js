@@ -7,15 +7,37 @@ const refreshButton = document.getElementById("refresh-campaigns");
 const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
+const formMessage = document.getElementById("form-message");
+const themeToggle = document.getElementById("theme-toggle");
+const themeToggleIcon = document.getElementById("theme-toggle-icon");
+const THEME_STORAGE_KEY = "nexus-sentinel-theme";
 let latestRecentScans = [];
+
+applyTheme(loadThemePreference());
+
+themeToggle.addEventListener("click", () => {
+  const nextTheme = document.body.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+  window.localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const url = urlInput.value.trim();
+  const preparedUrl = prepareUrl(urlInput.value);
+  if (!preparedUrl.ok) {
+    formMessage.textContent = preparedUrl.message;
+    formMessage.className = "form-message error";
+    return;
+  }
+
+  const url = preparedUrl.url;
   if (!url) {
     return;
   }
 
+  urlInput.value = url;
+  formMessage.textContent = "Analysis request ready.";
+  formMessage.className = "form-message muted";
   result.innerHTML = '<p class="muted">Analyzing...</p>';
 
   try {
@@ -31,6 +53,15 @@ form.addEventListener("submit", async (event) => {
   } catch (error) {
     result.innerHTML = `<p class="error">${error.message}</p>`;
   }
+});
+
+document.querySelectorAll("[data-sample-url]").forEach((button) => {
+  button.addEventListener("click", () => {
+    urlInput.value = button.dataset.sampleUrl;
+    formMessage.textContent = "Sample URL loaded.";
+    formMessage.className = "form-message muted";
+    urlInput.focus();
+  });
 });
 
 refreshButton.addEventListener("click", () => {
@@ -72,6 +103,11 @@ async function loadCampaigns() {
               </div>
               <p class="campaign-meta">Fingerprint: ${campaign.threat_fingerprint_id}</p>
               <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
+              <p class="campaign-meta">Common signals: ${
+                campaign.common_risk_factors.length
+                  ? campaign.common_risk_factors.join(" | ")
+                  : "No repeated factors yet"
+              }</p>
               <ul>
                 ${campaign.example_urls.map((url) => `<li>${url}</li>`).join("")}
               </ul>
@@ -144,6 +180,7 @@ function renderResult(data) {
       <div>
         <p class="metric-label">Last Scan</p>
         <p class="result-url">${data.url}</p>
+        <p class="result-time">${formatTimestamp(data.analyzed_at)}</p>
       </div>
       <span class="badge large ${statusClass(data.classification)}">${data.classification}</span>
     </div>
@@ -199,6 +236,7 @@ function renderRecentScans(scans) {
           <div class="recent-meta">
             <span>Risk ${scan.risk_score}/100</span>
             <span>${scan.campaign_id}</span>
+            <span>${formatTimestamp(scan.analyzed_at)}</span>
           </div>
         </button>
       `
@@ -222,6 +260,64 @@ function statusClass(classification) {
     return "status-suspicious";
   }
   return "status-safe";
+}
+
+function prepareUrl(rawValue) {
+  const trimmed = rawValue.trim();
+  if (!trimmed) {
+    return { ok: false, message: "Enter a URL to analyze." };
+  }
+
+  const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
+
+  try {
+    const parsed = new URL(withScheme);
+    if (!parsed.hostname) {
+      return { ok: false, message: "Please enter a valid URL." };
+    }
+    return { ok: true, url: parsed.toString() };
+  } catch (_error) {
+    return { ok: false, message: "Please enter a valid URL." };
+  }
+}
+
+function formatTimestamp(timestamp) {
+  if (!timestamp) {
+    return "Time unavailable";
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return "Time unavailable";
+  }
+
+  return date.toLocaleString();
+}
+
+function loadThemePreference() {
+  const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function applyTheme(theme) {
+  document.body.dataset.theme = theme;
+  themeToggleIcon.textContent = theme === "dark" ? "☀" : "☾";
+  themeToggle.setAttribute(
+    "aria-label",
+    theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+  );
+  themeToggle.setAttribute(
+    "title",
+    theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+  );
 }
 
 void loadCampaigns();

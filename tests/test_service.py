@@ -20,10 +20,12 @@ class AnalysisServiceTests(unittest.TestCase):
 
         self.assertEqual(first.campaign_id, second.campaign_id)
         self.assertEqual(second.campaign_size, 2)
+        self.assertTrue(first.analyzed_at)
 
         campaigns = service.list_campaigns()
         self.assertEqual(len(campaigns), 1)
         self.assertEqual(campaigns[0]["size"], 2)
+        self.assertTrue(campaigns[0]["common_risk_factors"])
 
     def test_recent_scans_returns_latest_first(self) -> None:
         service = AnalysisService()
@@ -51,6 +53,7 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertEqual(scans[0]["campaign_id"], saved.campaign_id)
             self.assertIn("extracted_features", scans[0])
             self.assertIn("score_breakdown", scans[0])
+            self.assertIn("analyzed_at", scans[0])
 
 
 if __name__ == "__main__":

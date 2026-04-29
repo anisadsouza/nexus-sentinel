@@ -8,6 +8,19 @@
   </head>
   <body>
     <main class="layout">
+      <div class="topbar">
+        <p class="topbar-label">Nexus Sentinel Dashboard</p>
+        <button
+          id="theme-toggle"
+          type="button"
+          class="theme-toggle"
+          aria-label="Toggle color theme"
+          title="Toggle color theme"
+        >
+          <span id="theme-toggle-icon" aria-hidden="true">☾</span>
+        </button>
+      </div>
+
       <section class="intro">
         <p class="eyebrow">Nexus Sentinel</p>
         <h1>Analyze one URL. See the pattern behind it.</h1>
@@ -34,6 +47,18 @@
               required
             >
             <button type="submit">Analyze</button>
+          </div>
+          <p id="form-message" class="form-message muted"></p>
+          <div class="sample-row" aria-label="Sample URLs">
+            <button type="button" class="sample-button" data-sample-url="https://example.com">
+              Safe sample
+            </button>
+            <button type="button" class="sample-button" data-sample-url="http://192.168.1.5/login">
+              IP-host sample
+            </button>
+            <button type="button" class="sample-button" data-sample-url="https://pay-update-secure-login.top/a/b/c/d/%2Freset?next=home">
+              High-risk sample
+            </button>
           </div>
         </form>
 

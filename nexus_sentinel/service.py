@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from nexus_sentinel.detector import analyze_url
@@ -8,6 +9,7 @@ from nexus_sentinel.detector import analyze_url
 @dataclass(frozen=True)
 class AnalysisRecord:
     url: str
+    analyzed_at: str
     risk_score: int
     classification: str
     risk_factors: tuple[str, ...]
@@ -35,6 +37,7 @@ class AnalysisService:
 
         record = AnalysisRecord(
             url=url,
+            analyzed_at=_timestamp_now(),
             risk_score=detection.risk_score,
             classification=detection.classification,
             risk_factors=detection.risk_factors,
@@ -60,12 +63,28 @@ class AnalysisService:
                     "classification": record.classification,
                     "size": 0,
                     "example_urls": [],
+                    "common_risk_factors": [],
                 },
             )
             campaign["size"] = int(campaign["size"]) + 1
             example_urls = campaign["example_urls"]
             if len(example_urls) < 3:
                 example_urls.append(record.url)
+
+        for campaign in grouped.values():
+            factor_counts: dict[str, int] = {}
+            for record in self._records:
+                if record.campaign_id != campaign["campaign_id"]:
+                    continue
+                for factor in record.risk_factors:
+                    factor_counts[factor] = factor_counts.get(factor, 0) + 1
+            campaign["common_risk_factors"] = [
+                factor
+                for factor, _count in sorted(
+                    factor_counts.items(),
+                    key=lambda item: (-item[1], item[0]),
+                )[:2]
+            ]
 
         return sorted(
             grouped.values(),
@@ -83,6 +102,7 @@ class AnalysisService:
         return [
             AnalysisRecord(
                 url=item["url"],
+                analyzed_at=item.get("analyzed_at", _timestamp_now()),
                 risk_score=item["risk_score"],
                 classification=item["classification"],
                 risk_factors=tuple(item["risk_factors"]),
@@ -109,3 +129,7 @@ class AnalysisService:
 
 def _campaign_id_for(threat_fingerprint_id: str) -> str:
     return "cmp_" + threat_fingerprint_id.removeprefix("fp_")
+
+
+def _timestamp_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
