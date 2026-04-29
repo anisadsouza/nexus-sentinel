@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --bg: #ffffff;
-  --surface: #ffffff;
+  --surface: #f8fafc;
   --surface-alt: #f8fafc;
   --text: #0f172a;
   --muted: #64748b;
@@ -69,8 +69,8 @@
 body {
   margin: 0;
   font-family: Inter, "SF Pro Text", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 16px;
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   color: var(--text);
@@ -78,9 +78,9 @@ body {
 }
 
 .layout {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 0 20px 64px;
+  padding: 0 32px 72px;
   display: grid;
   gap: 0;
 }
@@ -91,9 +91,9 @@ body {
 }
 
 .topbar-inner {
-  max-width: 1120px;
+  max-width: 1440px;
   margin: 0 auto;
-  padding: 14px 20px;
+  padding: 16px 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -110,6 +110,7 @@ body {
   margin-bottom: 0;
   color: var(--topbar-brand);
   font-size: 10px;
+  font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
@@ -125,8 +126,8 @@ body {
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 28px;
-  padding: 22px 28px;
+  gap: 32px;
+  padding: 28px 40px;
   background: var(--grid-bg);
 }
 
@@ -138,8 +139,8 @@ body {
 .eyebrow {
   margin: 0 0 10px;
   color: var(--accent-strong);
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -152,10 +153,10 @@ p {
 }
 
 h1 {
-  font-size: 26px;
-  font-weight: 500;
-  line-height: 1.25;
-  margin-bottom: 10px;
+  font-size: 38px;
+  font-weight: 700;
+  line-height: 1.18;
+  margin-bottom: 12px;
 }
 
 .lede,
@@ -164,26 +165,27 @@ h1 {
 }
 
 .lede {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.6;
-  max-width: 720px;
+  max-width: 920px;
 }
 
 .intro {
   background: var(--surface);
-  padding: 36px 28px 28px;
+  padding: 40px 40px 32px;
 }
 
 .analyze-form {
   display: grid;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 22px;
+  max-width: 1080px;
 }
 
 .form-message {
   min-height: 18px;
   margin-bottom: 0;
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .theme-toggle {
@@ -199,12 +201,13 @@ h1 {
   justify-content: center;
   font-size: 20px;
   line-height: 1;
+  font-weight: 700;
 }
 
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 22px;
+  margin-top: 28px;
   background: var(--surface-alt);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -212,7 +215,7 @@ h1 {
 }
 
 .overview-item {
-  padding: 18px 20px;
+  padding: 22px 24px;
   background: transparent;
   border-right: 1px solid var(--border);
   border-radius: 0;
@@ -232,7 +235,7 @@ input,
 button {
   min-height: 42px;
   border: 1px solid var(--border);
-  font-size: 14px;
+  font-size: 15px;
 }
 
 input {
@@ -241,6 +244,7 @@ input {
   background: var(--input-bg);
   border-radius: 6px;
   font-family: "SFMono-Regular", Consolas, monospace;
+  font-weight: 600;
   color: var(--text);
 }
 
@@ -250,6 +254,7 @@ button {
   background: var(--accent);
   cursor: pointer;
   border-radius: 6px;
+  font-weight: 700;
 }
 
 button.secondary {
@@ -260,19 +265,20 @@ button.secondary {
 .metric-label {
   margin-bottom: 4px;
   color: var(--label);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .metric-value {
-  font-size: 28px;
-  font-weight: 500;
+  font-size: 36px;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
 .metric-value.small {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .overview-item:last-child .metric-value {
@@ -291,7 +297,8 @@ button.secondary {
   color: var(--muted);
   background: var(--chip-bg);
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .section-heading,
@@ -303,19 +310,20 @@ button.secondary {
 }
 
 .section-heading {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .section-heading h2 {
   margin-bottom: 0;
-  font-size: 17px;
-  font-weight: 500;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .section-kicker {
   margin-bottom: 6px;
   color: var(--label);
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -332,7 +340,7 @@ button.secondary {
 
 .recent-item,
 .campaign-item {
-  padding: 18px;
+  padding: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -348,13 +356,14 @@ button.secondary {
 .campaign-meta,
 .recent-meta {
   color: var(--meta);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 400;
 }
 
 .campaign-id {
   margin-bottom: 0;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text);
   font-family: "SFMono-Regular", Consolas, monospace;
 }
@@ -373,7 +382,8 @@ button.secondary {
 .recent-url {
   margin-bottom: 8px;
   color: var(--accent-strong);
-  font-size: 13px;
+  font-size: 16px;
+  font-weight: 700;
   font-family: "SFMono-Regular", Consolas, monospace;
   overflow-wrap: anywhere;
 }
@@ -410,8 +420,8 @@ button.secondary {
   border-radius: 20px;
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .status-safe {
@@ -442,8 +452,8 @@ button.secondary {
   justify-content: center;
   padding: 4px 9px;
   border-radius: 20px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .signal-pill-row,
@@ -451,13 +461,14 @@ button.secondary {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 
 .signal-pill {
   padding: 3px 7px;
   border-radius: 3px;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .signal-bad {
@@ -475,14 +486,15 @@ button.secondary {
   border-radius: 6px;
   background: var(--url-pill-bg);
   color: var(--accent-strong);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   font-family: "SFMono-Regular", Consolas, monospace;
   overflow-wrap: anywhere;
 }
 
 .result-panel {
-  margin-top: 18px;
-  padding: 24px;
+  margin-top: 22px;
+  padding: 28px 32px;
   background: var(--surface-alt);
   border-radius: 8px;
   border-bottom: 1px solid var(--border);
@@ -491,12 +503,12 @@ button.secondary {
 .result-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  gap: 32px;
+  gap: 40px;
   align-items: start;
 }
 
 .score-column {
-  min-width: 120px;
+  min-width: 140px;
 }
 
 .gauge-wrap {
@@ -538,14 +550,15 @@ button.secondary {
 
 .gauge-score {
   margin-bottom: 0;
-  font-size: 24px;
-  font-weight: 500;
+  font-size: 30px;
+  font-weight: 700;
   color: var(--amber);
 }
 
 .gauge-total {
   margin-bottom: 0;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
   color: color-mix(in srgb, var(--amber) 70%, transparent);
 }
 
@@ -577,8 +590,8 @@ button.secondary {
 
 .verdict-title {
   margin-bottom: 4px;
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 700;
 }
 
 .verdict-medium .verdict-title,
@@ -601,7 +614,8 @@ button.secondary {
 
 .verdict-subtitle {
   margin-bottom: 0;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   opacity: 0.8;
   line-height: 1.5;
   overflow-wrap: anywhere;
@@ -647,14 +661,15 @@ button.secondary {
 }
 
 .factor-text {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--factor-text);
 }
 
 .factor-points {
   margin-bottom: 0;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .factor-bad ~ .factor-points {
@@ -681,14 +696,15 @@ button.secondary {
   border-radius: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   font-family: "SFMono-Regular", Consolas, monospace;
   color: var(--muted);
 }
 
 @media (max-width: 700px) {
   h1 {
-    font-size: 22px;
+    font-size: 30px;
   }
 
   .dashboard-grid,
@@ -714,6 +730,11 @@ button.secondary {
   .dashboard-grid {
     padding-left: 0;
     padding-right: 0;
+  }
+
+  .result-panel {
+    padding-left: 20px;
+    padding-right: 20px;
   }
 
   .overview-item {
