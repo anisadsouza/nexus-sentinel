@@ -10,6 +10,7 @@ class DetectionResult:
     classification: str
     risk_factors: tuple[str, ...]
     threat_fingerprint_id: str
+    extracted_features: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -24,6 +25,7 @@ def analyze_url(url: str) -> DetectionResult:
         classification=_classify(score),
         risk_factors=tuple(factors),
         threat_fingerprint_id=generate_threat_fingerprint(features),
+        extracted_features=_serialize_features(features),
     )
 
 
@@ -86,3 +88,19 @@ def _classify(score: int) -> str:
     if score >= 35:
         return "suspicious"
     return "safe"
+
+
+def _serialize_features(features: UrlFeatures) -> dict[str, object]:
+    return {
+        "url_length": features.url_length,
+        "uses_https": features.uses_https,
+        "hostname": features.hostname,
+        "is_ip_hostname": features.is_ip_hostname,
+        "subdomain_count": features.subdomain_count,
+        "hostname_hyphen_count": features.hostname_hyphen_count,
+        "path_depth": features.path_depth,
+        "has_encoded_characters": features.has_encoded_characters,
+        "has_suspicious_tld": features.has_suspicious_tld,
+        "suspicious_keywords": list(features.suspicious_keywords),
+        "query_parameter_count": features.query_parameter_count,
+    }

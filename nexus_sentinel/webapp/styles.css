@@ -210,6 +210,14 @@ button.secondary {
   border-radius: 8px;
 }
 
+.recent-item {
+  width: 100%;
+  text-align: left;
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
 .campaign-meta,
 .recent-meta {
   color: var(--muted);
@@ -257,6 +265,24 @@ button.secondary {
   color: var(--danger);
 }
 
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.feature-item {
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.feature-value {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
 ul {
   margin-bottom: 0;
   padding-left: 18px;
@@ -269,6 +295,7 @@ ul {
 
   .dashboard-grid,
   .overview-grid,
+  .feature-grid,
   .input-row,
   .result-grid {
     grid-template-columns: 1fr;

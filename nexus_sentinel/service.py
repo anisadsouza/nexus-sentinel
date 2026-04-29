@@ -12,6 +12,7 @@ class AnalysisRecord:
     classification: str
     risk_factors: tuple[str, ...]
     threat_fingerprint_id: str
+    extracted_features: dict[str, object]
     campaign_id: str
     campaign_size: int
 
@@ -37,6 +38,7 @@ class AnalysisService:
             classification=detection.classification,
             risk_factors=detection.risk_factors,
             threat_fingerprint_id=detection.threat_fingerprint_id,
+            extracted_features=detection.extracted_features,
             campaign_id=campaign_id,
             campaign_size=campaign_size,
         )
@@ -83,6 +85,7 @@ class AnalysisService:
                 classification=item["classification"],
                 risk_factors=tuple(item["risk_factors"]),
                 threat_fingerprint_id=item["threat_fingerprint_id"],
+                extracted_features=dict(item.get("extracted_features", {})),
                 campaign_id=item["campaign_id"],
                 campaign_size=item["campaign_size"],
             )

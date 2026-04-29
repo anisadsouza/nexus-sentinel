@@ -7,6 +7,7 @@ const refreshButton = document.getElementById("refresh-campaigns");
 const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
+let latestRecentScans = [];
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -34,6 +35,19 @@ form.addEventListener("submit", async (event) => {
 
 refreshButton.addEventListener("click", () => {
   void loadCampaigns();
+});
+
+recentScans.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-scan-index]");
+  if (!button) {
+    return;
+  }
+
+  const index = Number(button.dataset.scanIndex);
+  const scan = latestRecentScans[index];
+  if (scan) {
+    renderResult(scan);
+  }
 });
 
 async function loadCampaigns() {
@@ -80,6 +94,34 @@ function renderResult(data) {
   const factorItems = data.risk_factors.length
     ? data.risk_factors.map((factor) => `<li>${factor}</li>`).join("")
     : "<li>No major URL-level rules were triggered.</li>";
+  const features = data.extracted_features || {};
+  const featureItems = [
+    ["HTTPS", features.uses_https ? "Yes" : "No"],
+    ["Hostname", features.hostname || "Unknown"],
+    ["IP Hostname", features.is_ip_hostname ? "Yes" : "No"],
+    ["URL Length", features.url_length ?? "Unknown"],
+    ["Subdomains", features.subdomain_count ?? "Unknown"],
+    ["Hyphens in Hostname", features.hostname_hyphen_count ?? "Unknown"],
+    ["Path Depth", features.path_depth ?? "Unknown"],
+    ["Encoded Characters", features.has_encoded_characters ? "Yes" : "No"],
+    ["High-Risk TLD", features.has_suspicious_tld ? "Yes" : "No"],
+    ["Query Parameters", features.query_parameter_count ?? "Unknown"],
+    [
+      "Keywords",
+      Array.isArray(features.suspicious_keywords) && features.suspicious_keywords.length
+        ? features.suspicious_keywords.join(", ")
+        : "None",
+    ],
+  ]
+    .map(
+      ([label, value]) => `
+        <div class="feature-item">
+          <p class="metric-label">${label}</p>
+          <p class="feature-value">${value}</p>
+        </div>
+      `
+    )
+    .join("");
 
   result.innerHTML = `
     <div class="result-header">
@@ -111,10 +153,16 @@ function renderResult(data) {
       <p class="metric-label">Risk Factors</p>
       <ul>${factorItems}</ul>
     </div>
+    <div class="list-block">
+      <p class="metric-label">Extracted Features</p>
+      <div class="feature-grid">${featureItems}</div>
+    </div>
   `;
 }
 
 function renderRecentScans(scans) {
+  latestRecentScans = scans;
+
   if (!scans.length) {
     recentScans.innerHTML = '<p class="muted">No recent scans yet.</p>';
     return;
@@ -122,8 +170,8 @@ function renderRecentScans(scans) {
 
   recentScans.innerHTML = scans
     .map(
-      (scan) => `
-        <article class="recent-item">
+      (scan, index) => `
+        <button type="button" class="recent-item" data-scan-index="${index}">
           <div class="campaign-topline">
             <p class="recent-url">${scan.url}</p>
             <span class="badge ${statusClass(scan.classification)}">${scan.classification}</span>
@@ -132,7 +180,7 @@ function renderRecentScans(scans) {
             <span>Risk ${scan.risk_score}/100</span>
             <span>${scan.campaign_id}</span>
           </div>
-        </article>
+        </button>
       `
     )
     .join("");

@@ -10,6 +10,8 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.classification, "safe")
         self.assertLess(result.risk_score, 35)
         self.assertEqual(result.risk_factors, ())
+        self.assertTrue(result.extracted_features["uses_https"])
+        self.assertEqual(result.extracted_features["hostname"], "example.com")
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(
@@ -31,6 +33,8 @@ class DetectorTests(unittest.TestCase):
         self.assertIn("URL contains encoded characters", result.risk_factors)
         self.assertIn("Hostname uses many hyphens", result.risk_factors)
         self.assertGreater(result.risk_score, 20)
+        self.assertTrue(result.extracted_features["has_suspicious_tld"])
+        self.assertTrue(result.extracted_features["has_encoded_characters"])
 
 
 if __name__ == "__main__":

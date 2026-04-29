@@ -23,6 +23,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(payload["url"], "https://example.com/login")
         self.assertIn("risk_score", payload)
         self.assertIn("campaign_id", payload)
+        self.assertIn("extracted_features", payload)
 
     def test_analyze_endpoint_rejects_missing_url(self) -> None:
         app = DashboardApp()
