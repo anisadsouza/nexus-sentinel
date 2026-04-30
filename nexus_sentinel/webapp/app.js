@@ -10,8 +10,10 @@ const highestRisk = document.getElementById("highest-risk");
 const formMessage = document.getElementById("form-message");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
+const clearUrlButton = document.getElementById("clear-url");
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
 let latestRecentScans = [];
+let selectedRecentScanIndex = null;
 
 applyTheme(loadThemePreference());
 
@@ -50,6 +52,8 @@ form.addEventListener("submit", async (event) => {
 
     renderResult(data);
     await loadCampaigns();
+    selectedRecentScanIndex = 0;
+    highlightSelectedRecentScan();
   } catch (error) {
     result.innerHTML = `<p class="error">${error.message}</p>`;
   }
@@ -62,6 +66,13 @@ document.querySelectorAll("[data-sample-url]").forEach((button) => {
     formMessage.className = "form-message muted";
     urlInput.focus();
   });
+});
+
+clearUrlButton.addEventListener("click", () => {
+  urlInput.value = "";
+  formMessage.textContent = "URL field cleared.";
+  formMessage.className = "form-message muted";
+  urlInput.focus();
 });
 
 refreshButton.addEventListener("click", () => {
@@ -77,7 +88,9 @@ recentScans.addEventListener("click", (event) => {
   const index = Number(button.dataset.scanIndex);
   const scan = latestRecentScans[index];
   if (scan) {
+    selectedRecentScanIndex = index;
     renderResult(scan);
+    highlightSelectedRecentScan();
   }
 });
 
@@ -118,6 +131,7 @@ async function loadCampaigns() {
 
     renderRecentScans(data.recent_scans);
     renderOverview(data.recent_scans, data.campaigns);
+    highlightSelectedRecentScan();
   } catch (error) {
     campaigns.innerHTML = `<p class="error">${error.message}</p>`;
     recentScans.innerHTML = '<p class="muted">Recent scans unavailable.</p>';
@@ -179,6 +193,10 @@ function renderResult(data) {
 function renderRecentScans(scans) {
   latestRecentScans = scans;
 
+  if (selectedRecentScanIndex !== null && selectedRecentScanIndex >= scans.length) {
+    selectedRecentScanIndex = null;
+  }
+
   if (!scans.length) {
     recentScans.innerHTML = '<p class="muted">No recent scans yet.</p>';
     return;
@@ -207,6 +225,13 @@ function renderRecentScans(scans) {
       `
     )
     .join("");
+}
+
+function highlightSelectedRecentScan() {
+  recentScans.querySelectorAll("[data-scan-index]").forEach((element) => {
+    const isSelected = Number(element.dataset.scanIndex) === selectedRecentScanIndex;
+    element.classList.toggle("recent-item-selected", isSelected);
+  });
 }
 
 function renderOverview(scans, campaignList) {

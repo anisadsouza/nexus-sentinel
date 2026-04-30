@@ -236,6 +236,11 @@ h1 {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.34);
 }
 
+[data-theme="dark"] .recent-item:hover,
+[data-theme="dark"] .campaign-item:hover {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -278,6 +283,16 @@ input {
   font-family: "SFMono-Regular", Consolas, monospace;
   font-weight: 600;
   color: var(--text);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 button {
@@ -331,6 +346,21 @@ button.secondary {
   border-radius: 20px;
   font-size: 13px;
   font-weight: 500;
+  transition:
+    color 160ms ease,
+    border-color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.sample-button:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.sample-button-clear {
+  color: var(--label);
 }
 
 .section-heading,
@@ -383,6 +413,23 @@ button.secondary {
   text-align: left;
   color: var(--text);
   cursor: pointer;
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.recent-item:hover,
+.campaign-item:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.recent-item-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .campaign-meta,
