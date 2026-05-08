@@ -13,6 +13,7 @@ class DetectorTests(unittest.TestCase):
         self.assertTrue(result.extracted_features["uses_https"])
         self.assertEqual(result.extracted_features["hostname"], "example.com")
         self.assertEqual(result.score_breakdown, ())
+        self.assertEqual(result.content_analysis["status"], "not_fetched")
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(
@@ -40,6 +41,7 @@ class DetectorTests(unittest.TestCase):
         self.assertTrue(
             any(item["rule"] == "high_risk_tld" for item in result.score_breakdown)
         )
+        self.assertIn("notes", result.content_analysis)
 
 
 if __name__ == "__main__":

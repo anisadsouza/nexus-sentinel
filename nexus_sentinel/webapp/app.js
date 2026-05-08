@@ -150,11 +150,13 @@ async function loadCampaigns() {
 function renderResult(data) {
   const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
   const features = data.extracted_features || {};
+  const contentAnalysis = data.content_analysis || {};
   const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
   const riskRows = buildRiskRows(scoreBreakdown);
   const goodRows = buildGoodSignalRows(features);
   const factRows = buildFactRows(features);
+  const contentRows = buildContentRows(contentAnalysis);
 
   result.innerHTML = `
     <div class="result-shell">
@@ -210,6 +212,16 @@ function renderResult(data) {
         <div class="fact-grid">${factRows}</div>
       </section>
     </div>
+    <section class="content-card">
+      <p class="section-kicker">Content Analysis</p>
+      <div class="content-status-row">
+        <span class="risk-pill ${contentAnalysis.status === "not_fetched" ? "status-suspicious" : "status-safe"}">
+          ${sentenceCase(contentAnalysis.status || "unknown")}
+        </span>
+        <p class="content-note">${contentAnalysis.notes || "No content analysis notes available."}</p>
+      </div>
+      <div class="fact-grid">${contentRows}</div>
+    </section>
   `;
 }
 
@@ -434,6 +446,37 @@ function buildFactRows(features) {
       `
     )
     .join("");
+}
+
+function buildContentRows(contentAnalysis) {
+  const contentFacts = [
+    ["Page Title", contentAnalysis.page_title || "Not fetched"],
+    ["Login Form", booleanLabel(contentAnalysis.login_form_detected)],
+    ["Password Field", booleanLabel(contentAnalysis.password_field_detected)],
+    ["Urgency Language", booleanLabel(contentAnalysis.urgency_language_detected)],
+    ["External Scripts", booleanLabel(contentAnalysis.external_scripts_detected)],
+  ];
+
+  return contentFacts
+    .map(
+      ([label, value]) => `
+        <div class="fact-item">
+          <p class="fact-label">${label}</p>
+          <p class="fact-value">${value}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function booleanLabel(value) {
+  if (value === true) {
+    return "Detected";
+  }
+  if (value === false) {
+    return "Not detected";
+  }
+  return "Not fetched";
 }
 
 function riskBarClass(score) {

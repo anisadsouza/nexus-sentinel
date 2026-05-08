@@ -613,6 +613,28 @@ button.secondary {
   background: var(--surface-alt);
 }
 
+.content-card {
+  margin-top: 16px;
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.content-status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.content-note {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .score-column {
   min-width: 140px;
 }

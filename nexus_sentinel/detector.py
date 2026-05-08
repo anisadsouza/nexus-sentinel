@@ -12,6 +12,7 @@ class DetectionResult:
     threat_fingerprint_id: str
     extracted_features: dict[str, object]
     score_breakdown: tuple[dict[str, object], ...]
+    content_analysis: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -28,6 +29,7 @@ def analyze_url(url: str) -> DetectionResult:
         threat_fingerprint_id=generate_threat_fingerprint(features),
         extracted_features=_serialize_features(features),
         score_breakdown=tuple(breakdown),
+        content_analysis=_build_content_analysis_placeholder(),
     )
 
 
@@ -154,4 +156,16 @@ def _serialize_features(features: UrlFeatures) -> dict[str, object]:
         "has_suspicious_tld": features.has_suspicious_tld,
         "suspicious_keywords": list(features.suspicious_keywords),
         "query_parameter_count": features.query_parameter_count,
+    }
+
+
+def _build_content_analysis_placeholder() -> dict[str, object]:
+    return {
+        "status": "not_fetched",
+        "page_title": None,
+        "login_form_detected": None,
+        "password_field_detected": None,
+        "urgency_language_detected": None,
+        "external_scripts_detected": None,
+        "notes": "Live webpage content analysis has not been enabled yet.",
     }
