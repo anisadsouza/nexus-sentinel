@@ -108,6 +108,16 @@ class AnalysisService:
             key=lambda campaign: (-int(campaign["size"]), str(campaign["campaign_id"])),
         )
 
+    def overview(self) -> dict[str, int]:
+        risk_scores = [record.risk_score for record in self._records]
+        return {
+            "total_scans": len(self._records),
+            "active_campaigns": len(
+                {record.campaign_id for record in self._records}
+            ),
+            "highest_risk": max(risk_scores, default=0),
+        }
+
     def recent_scans(self, limit: int = 10) -> list[dict[str, object]]:
         return [record.to_dict() for record in reversed(self._records[-limit:])]
 

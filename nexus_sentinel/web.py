@@ -44,7 +44,7 @@ class DashboardApp:
                 200,
                 {
                     "campaigns": self._service.list_campaigns(),
-                    "recent_scans": self._service.recent_scans(),
+                    "overview": self._service.overview(),
                 },
             )
 

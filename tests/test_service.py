@@ -41,6 +41,18 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertEqual(scans[0]["url"], latest.url)
         self.assertEqual(scans[0]["classification"], latest.classification)
 
+    def test_overview_summarizes_scan_history(self) -> None:
+        service = AnalysisService()
+
+        service.analyze("https://example.com")
+        service.analyze("http://192.168.1.5/login")
+
+        overview = service.overview()
+
+        self.assertEqual(overview["total_scans"], 2)
+        self.assertEqual(overview["active_campaigns"], 2)
+        self.assertGreaterEqual(overview["highest_risk"], 1)
+
     def test_records_persist_when_storage_path_is_used(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             storage_path = Path(tmp_dir) / "history.json"

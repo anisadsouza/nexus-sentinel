@@ -125,13 +125,12 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   padding: 28px 40px;
   background: var(--grid-bg);
 }
 
-.recent-section,
 .campaigns-section {
   padding: 0;
 }
@@ -240,7 +239,6 @@ h1 {
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.34);
 }
 
-[data-theme="dark"] .recent-item:hover,
 [data-theme="dark"] .campaign-item:hover {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
@@ -404,12 +402,6 @@ button.secondary {
   gap: 12px;
 }
 
-.recent-list {
-  display: grid;
-  gap: 12px;
-}
-
-.recent-item,
 .campaign-item {
   padding: 20px;
   background: var(--surface);
@@ -417,32 +409,13 @@ button.secondary {
   border-radius: 8px;
 }
 
-.recent-item {
-  width: 100%;
-  text-align: left;
-  color: var(--text);
-  cursor: pointer;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    background-color 160ms ease;
-}
-
-.recent-item:hover,
 .campaign-item:hover {
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
 }
 
-.recent-item-selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent);
-}
-
-.campaign-meta,
-.recent-meta {
+.campaign-meta {
   color: var(--meta);
   font-size: 13px;
   font-weight: 400;
@@ -461,79 +434,6 @@ button.secondary {
   font-weight: 700;
   color: var(--text);
   font-family: "SFMono-Regular", Consolas, monospace;
-}
-
-.recent-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 8px;
-  align-items: center;
-}
-
-.recent-meta-top {
-  justify-content: space-between;
-}
-
-.recent-meta-bottom {
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 6px;
-}
-
-.recent-score {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.recent-campaign {
-  display: inline-flex;
-  align-items: center;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: var(--surface-alt);
-  border: 1px solid var(--border);
-  font-size: 12px;
-  font-family: "SFMono-Regular", Consolas, monospace;
-}
-
-.recent-url {
-  margin-bottom: 8px;
-  color: var(--accent-strong);
-  font-size: 16px;
-  font-weight: 700;
-  font-family: "SFMono-Regular", Consolas, monospace;
-  line-height: 1.45;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  overflow-wrap: anywhere;
-}
-
-.scan-progress {
-  height: 3px;
-  background: var(--border);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.scan-progress-fill {
-  height: 100%;
-  border-radius: 999px;
-}
-
-.bar-safe {
-  background: var(--green);
-}
-
-.bar-medium {
-  background: var(--amber);
-}
-
-.bar-high {
-  background: var(--red);
 }
 
 .badge {

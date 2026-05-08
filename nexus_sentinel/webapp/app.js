@@ -2,7 +2,6 @@ const form = document.getElementById("analyze-form");
 const urlInput = document.getElementById("url-input");
 const result = document.getElementById("result");
 const campaigns = document.getElementById("campaigns");
-const recentScans = document.getElementById("recent-scans");
 const refreshButton = document.getElementById("refresh-campaigns");
 const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
@@ -13,8 +12,6 @@ const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
-let latestRecentScans = [];
-let selectedRecentScanIndex = null;
 
 applyTheme(loadThemePreference());
 
@@ -54,8 +51,6 @@ form.addEventListener("submit", async (event) => {
 
     renderResult(data);
     await loadCampaigns();
-    selectedRecentScanIndex = 0;
-    highlightSelectedRecentScan();
     formMessage.textContent = "Analysis complete.";
     formMessage.className = "form-message success";
   } catch (error) {
@@ -85,21 +80,6 @@ clearUrlButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void loadCampaigns();
-});
-
-recentScans.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-scan-index]");
-  if (!button) {
-    return;
-  }
-
-  const index = Number(button.dataset.scanIndex);
-  const scan = latestRecentScans[index];
-  if (scan) {
-    selectedRecentScanIndex = index;
-    renderResult(scan);
-    highlightSelectedRecentScan();
-  }
 });
 
 async function loadCampaigns() {
@@ -140,13 +120,10 @@ async function loadCampaigns() {
         .join("");
     }
 
-    renderRecentScans(data.recent_scans);
-    renderOverview(data.recent_scans, data.campaigns);
-    highlightSelectedRecentScan();
+    renderOverview(data.overview || {});
   } catch (error) {
     campaigns.innerHTML = `<p class="error">${error.message}</p>`;
-    recentScans.innerHTML = '<p class="muted">Recent scans unavailable.</p>';
-    renderOverview([], []);
+    renderOverview({});
   }
 }
 
@@ -247,61 +224,15 @@ function renderResult(data) {
   `;
 }
 
-function renderRecentScans(scans) {
-  latestRecentScans = scans;
-
-  if (selectedRecentScanIndex !== null && selectedRecentScanIndex >= scans.length) {
-    selectedRecentScanIndex = null;
-  }
-
-  if (!scans.length) {
-    recentScans.innerHTML = '<p class="muted">No recent scans yet.</p>';
-    return;
-  }
-
-  recentScans.innerHTML = scans
-    .map(
-      (scan, index) => `
-        <button type="button" class="recent-item" data-scan-index="${index}">
-          <p class="recent-url" title="${scan.url}">${scan.url}</p>
-          <div class="scan-progress">
-            <div
-              class="scan-progress-fill ${riskBarClass(scan.risk_score)}"
-              style="width: ${Math.max(4, scan.risk_score)}%;"
-            ></div>
-          </div>
-          <div class="recent-meta recent-meta-top">
-            <span class="risk-pill ${statusClass(scan.classification)}">${sentenceCase(scan.classification)}</span>
-            <span class="recent-score">${scan.risk_score}/100</span>
-          </div>
-          <div class="recent-meta recent-meta-bottom">
-            <span>${formatTimestamp(scan.analyzed_at)}</span>
-            <span class="recent-campaign">${scan.campaign_id}</span>
-          </div>
-        </button>
-      `
-    )
-    .join("");
-}
-
-function highlightSelectedRecentScan() {
-  recentScans.querySelectorAll("[data-scan-index]").forEach((element) => {
-    const isSelected = Number(element.dataset.scanIndex) === selectedRecentScanIndex;
-    element.classList.toggle("recent-item-selected", isSelected);
-  });
-}
-
 function setAnalyzeButtonState(isLoading) {
   analyzeButton.disabled = isLoading;
   analyzeButton.textContent = isLoading ? "Analyzing..." : "Analyze";
 }
 
-function renderOverview(scans, campaignList) {
-  totalScans.textContent = String(scans.length);
-  activeCampaigns.textContent = String(campaignList.length);
-  highestRisk.textContent = String(
-    scans.reduce((max, scan) => Math.max(max, scan.risk_score), 0)
-  );
+function renderOverview(overview) {
+  totalScans.textContent = String(overview.total_scans || 0);
+  activeCampaigns.textContent = String(overview.active_campaigns || 0);
+  highestRisk.textContent = String(overview.highest_risk || 0);
 }
 
 function statusClass(classification) {
@@ -556,16 +487,6 @@ function booleanLabel(value) {
     return "Not detected";
   }
   return "Not fetched";
-}
-
-function riskBarClass(score) {
-  if (score >= 70) {
-    return "bar-high";
-  }
-  if (score >= 35) {
-    return "bar-medium";
-  }
-  return "bar-safe";
 }
 
 function verdictToneClass(classification) {

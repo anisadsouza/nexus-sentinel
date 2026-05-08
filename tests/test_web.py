@@ -56,6 +56,8 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "application/json")
         payload = json.loads(body)
         self.assertEqual(len(payload["campaigns"]), 1)
+        self.assertIn("overview", payload)
+        self.assertIn("total_scans", payload["overview"])
         self.assertIn("first_seen", payload["campaigns"][0])
         self.assertIn("latest_seen", payload["campaigns"][0])
         self.assertIn("grouping_reason", payload["campaigns"][0])
