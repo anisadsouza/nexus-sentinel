@@ -468,10 +468,33 @@ button.secondary {
   flex-wrap: wrap;
   gap: 10px;
   margin-top: 8px;
+  align-items: center;
 }
 
-.recent-meta.subtle {
+.recent-meta-top {
+  justify-content: space-between;
+}
+
+.recent-meta-bottom {
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 6px;
+}
+
+.recent-score {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.recent-campaign {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-family: "SFMono-Regular", Consolas, monospace;
 }
 
 .recent-url {
@@ -480,6 +503,12 @@ button.secondary {
   font-size: 16px;
   font-weight: 700;
   font-family: "SFMono-Regular", Consolas, monospace;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
   overflow-wrap: anywhere;
 }
 

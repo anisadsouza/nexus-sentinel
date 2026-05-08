@@ -263,20 +263,20 @@ function renderRecentScans(scans) {
     .map(
       (scan, index) => `
         <button type="button" class="recent-item" data-scan-index="${index}">
-          <p class="recent-url">${scan.url}</p>
+          <p class="recent-url" title="${scan.url}">${scan.url}</p>
           <div class="scan-progress">
             <div
               class="scan-progress-fill ${riskBarClass(scan.risk_score)}"
               style="width: ${Math.max(4, scan.risk_score)}%;"
             ></div>
           </div>
-          <div class="recent-meta">
+          <div class="recent-meta recent-meta-top">
             <span class="risk-pill ${statusClass(scan.classification)}">${sentenceCase(scan.classification)}</span>
-            <span>${scan.risk_score}/100</span>
-            <span>${formatTimestamp(scan.analyzed_at)}</span>
+            <span class="recent-score">${scan.risk_score}/100</span>
           </div>
-          <div class="recent-meta subtle">
-            <span>${scan.campaign_id}</span>
+          <div class="recent-meta recent-meta-bottom">
+            <span>${formatTimestamp(scan.analyzed_at)}</span>
+            <span class="recent-campaign">${scan.campaign_id}</span>
           </div>
         </button>
       `
@@ -519,7 +519,6 @@ function buildRedirectRows(redirectAnalysis) {
 
 function buildTips(data, features) {
   const tips = [
-    "Running the same URL again should keep the same risk score and verdict right now, because the current analyzer is deterministic.",
     "Each run is still saved as a new scan, so the timestamp, recent history, and campaign size can change.",
   ];
 
