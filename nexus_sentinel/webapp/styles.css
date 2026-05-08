@@ -635,6 +635,22 @@ button.secondary {
   color: var(--muted);
 }
 
+.info-card {
+  margin-bottom: 0;
+}
+
+.info-list {
+  display: grid;
+  gap: 12px;
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
 .score-column {
   min-width: 140px;
 }

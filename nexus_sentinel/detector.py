@@ -13,6 +13,7 @@ class DetectionResult:
     extracted_features: dict[str, object]
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
+    redirect_analysis: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -30,6 +31,7 @@ def analyze_url(url: str) -> DetectionResult:
         extracted_features=_serialize_features(features),
         score_breakdown=tuple(breakdown),
         content_analysis=_build_content_analysis_placeholder(),
+        redirect_analysis=_build_redirect_analysis_placeholder(),
     )
 
 
@@ -168,4 +170,15 @@ def _build_content_analysis_placeholder() -> dict[str, object]:
         "urgency_language_detected": None,
         "external_scripts_detected": None,
         "notes": "Live webpage content analysis has not been enabled yet.",
+    }
+
+
+def _build_redirect_analysis_placeholder() -> dict[str, object]:
+    return {
+        "status": "not_fetched",
+        "redirect_count": None,
+        "final_url": None,
+        "cross_domain_redirect_detected": None,
+        "suspicious_redirect_chain": None,
+        "notes": "Live redirect tracing has not been enabled yet.",
     }

@@ -17,6 +17,7 @@ class AnalysisRecord:
     extracted_features: dict[str, object]
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
+    redirect_analysis: dict[str, object]
     campaign_id: str
     campaign_size: int
 
@@ -46,6 +47,7 @@ class AnalysisService:
             extracted_features=detection.extracted_features,
             score_breakdown=detection.score_breakdown,
             content_analysis=detection.content_analysis,
+            redirect_analysis=detection.redirect_analysis,
             campaign_id=campaign_id,
             campaign_size=campaign_size,
         )
@@ -112,6 +114,7 @@ class AnalysisService:
                 extracted_features=dict(item.get("extracted_features", {})),
                 score_breakdown=tuple(item.get("score_breakdown", ())),
                 content_analysis=dict(item.get("content_analysis", {})),
+                redirect_analysis=dict(item.get("redirect_analysis", {})),
                 campaign_id=item["campaign_id"],
                 campaign_size=item["campaign_size"],
             )

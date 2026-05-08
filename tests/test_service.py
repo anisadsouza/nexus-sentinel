@@ -54,6 +54,7 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertIn("extracted_features", scans[0])
             self.assertIn("score_breakdown", scans[0])
             self.assertIn("content_analysis", scans[0])
+            self.assertIn("redirect_analysis", scans[0])
             self.assertIn("analyzed_at", scans[0])
 
 

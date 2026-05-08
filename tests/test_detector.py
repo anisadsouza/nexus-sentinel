@@ -14,6 +14,7 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.extracted_features["hostname"], "example.com")
         self.assertEqual(result.score_breakdown, ())
         self.assertEqual(result.content_analysis["status"], "not_fetched")
+        self.assertEqual(result.redirect_analysis["status"], "not_fetched")
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(
@@ -42,6 +43,7 @@ class DetectorTests(unittest.TestCase):
             any(item["rule"] == "high_risk_tld" for item in result.score_breakdown)
         )
         self.assertIn("notes", result.content_analysis)
+        self.assertIn("notes", result.redirect_analysis)
 
 
 if __name__ == "__main__":

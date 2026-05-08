@@ -26,6 +26,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("extracted_features", payload)
         self.assertIn("score_breakdown", payload)
         self.assertIn("content_analysis", payload)
+        self.assertIn("redirect_analysis", payload)
 
     def test_analyze_endpoint_rejects_missing_url(self) -> None:
         app = DashboardApp()

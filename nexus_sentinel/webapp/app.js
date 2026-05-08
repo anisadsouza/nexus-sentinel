@@ -151,12 +151,15 @@ function renderResult(data) {
   const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
   const features = data.extracted_features || {};
   const contentAnalysis = data.content_analysis || {};
+  const redirectAnalysis = data.redirect_analysis || {};
   const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
   const riskRows = buildRiskRows(scoreBreakdown);
   const goodRows = buildGoodSignalRows(features);
   const factRows = buildFactRows(features);
   const contentRows = buildContentRows(contentAnalysis);
+  const redirectRows = buildRedirectRows(redirectAnalysis);
+  const tipsMarkup = buildTips(data, features);
 
   result.innerHTML = `
     <div class="result-shell">
@@ -221,6 +224,22 @@ function renderResult(data) {
         <p class="content-note">${contentAnalysis.notes || "No content analysis notes available."}</p>
       </div>
       <div class="fact-grid">${contentRows}</div>
+    </section>
+    <section class="content-card">
+      <p class="section-kicker">Redirect Analysis</p>
+      <div class="content-status-row">
+        <span class="risk-pill ${redirectAnalysis.status === "not_fetched" ? "status-suspicious" : "status-safe"}">
+          ${sentenceCase(redirectAnalysis.status || "unknown")}
+        </span>
+        <p class="content-note">${redirectAnalysis.notes || "No redirect analysis notes available."}</p>
+      </div>
+      <div class="fact-grid">${redirectRows}</div>
+    </section>
+    <section class="content-card info-card">
+      <p class="section-kicker">Tips</p>
+      <div class="info-list">
+        ${tipsMarkup}
+      </div>
     </section>
   `;
 }
@@ -463,6 +482,64 @@ function buildContentRows(contentAnalysis) {
         <div class="fact-item">
           <p class="fact-label">${label}</p>
           <p class="fact-value">${value}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildRedirectRows(redirectAnalysis) {
+  const redirectFacts = [
+    ["Redirect Count", redirectAnalysis.redirect_count ?? "Not fetched"],
+    ["Final URL", redirectAnalysis.final_url || "Not fetched"],
+    [
+      "Cross-domain Redirect",
+      booleanLabel(redirectAnalysis.cross_domain_redirect_detected),
+    ],
+    [
+      "Suspicious Chain",
+      booleanLabel(redirectAnalysis.suspicious_redirect_chain),
+    ],
+  ];
+
+  return redirectFacts
+    .map(
+      ([label, value]) => `
+        <div class="fact-item">
+          <p class="fact-label">${label}</p>
+          <p class="fact-value">${value}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildTips(data, features) {
+  const tips = [
+    "Running the same URL again should keep the same risk score and verdict right now, because the current analyzer is deterministic.",
+    "Each run is still saved as a new scan, so the timestamp, recent history, and campaign size can change.",
+  ];
+
+  if (data.classification === "safe") {
+    tips.push(
+      "Safe here means no strong URL-level warnings were found yet. Live page-content and redirect fetching are still placeholders."
+    );
+  } else {
+    tips.push(
+      "Treat suspicious links as untrusted until content and redirect checks are fully enabled."
+    );
+  }
+
+  if (features.uses_https === false) {
+    tips.push("Lack of HTTPS is a warning sign, but it should be read together with the rest of the pattern.");
+  }
+
+  return tips
+    .map(
+      (tip) => `
+        <div class="info-row">
+          <span class="factor-icon factor-good">i</span>
+          <span class="factor-text">${tip}</span>
         </div>
       `
     )
