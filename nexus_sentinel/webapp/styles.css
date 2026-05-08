@@ -125,14 +125,23 @@ body {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 360px);
+  gap: 28px;
+  align-items: start;
   padding: 28px 40px;
   background: var(--grid-bg);
 }
 
 .campaigns-section {
   padding: 0;
+}
+
+.tips-section {
+  padding: 0;
+}
+
+.tips-section .section-heading {
+  margin-bottom: 16px;
 }
 
 .eyebrow {
@@ -400,6 +409,54 @@ button.secondary {
 .campaigns-list {
   display: grid;
   gap: 12px;
+}
+
+.tips-card {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  position: sticky;
+  top: 24px;
+}
+
+.tips-list {
+  display: grid;
+  gap: 16px;
+}
+
+.tip-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.tip-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.tip-title {
+  margin-bottom: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tip-copy {
+  margin-bottom: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--muted);
 }
 
 .campaign-item {
