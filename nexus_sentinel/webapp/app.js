@@ -149,9 +149,12 @@ async function loadCampaigns() {
 
 function renderResult(data) {
   const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
+  const features = data.extracted_features || {};
   const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
-  const factorRows = buildFactorRows(data, scoreBreakdown);
+  const riskRows = buildRiskRows(scoreBreakdown);
+  const goodRows = buildGoodSignalRows(features);
+  const factRows = buildFactRows(features);
 
   result.innerHTML = `
     <div class="result-shell">
@@ -187,12 +190,25 @@ function renderResult(data) {
             </p>
           </div>
         </div>
-        <div class="factor-list">${factorRows}</div>
         <div class="meta-strip">
           <span class="meta-pill">${data.campaign_id}</span>
           <span class="meta-pill">Campaign size ${data.campaign_size}</span>
         </div>
       </div>
+    </div>
+    <div class="explanation-grid">
+      <section class="explanation-card">
+        <p class="section-kicker">Detected Risks</p>
+        <div class="factor-list compact">${riskRows}</div>
+      </section>
+      <section class="explanation-card">
+        <p class="section-kicker">Positive Signals</p>
+        <div class="factor-list compact">${goodRows}</div>
+      </section>
+      <section class="explanation-card explanation-card-facts">
+        <p class="section-kicker">Observed Facts</p>
+        <div class="fact-grid">${factRows}</div>
+      </section>
     </div>
   `;
 }
@@ -329,7 +345,7 @@ function buildRingMetrics(score) {
   return { dashArray, dashOffset };
 }
 
-function buildFactorRows(data, scoreBreakdown) {
+function buildRiskRows(scoreBreakdown) {
   if (!scoreBreakdown.length) {
     return `
       <div class="factor-row">
@@ -351,6 +367,72 @@ function buildFactorRows(data, scoreBreakdown) {
         </div>
       `;
     })
+    .join("");
+}
+
+function buildGoodSignalRows(features) {
+  const rows = [];
+
+  if (features.uses_https) {
+    rows.push("Uses HTTPS");
+  }
+  if (!features.is_ip_hostname) {
+    rows.push("Hostname is not a raw IP address");
+  }
+  if (!features.has_suspicious_tld) {
+    rows.push("Top-level domain is not high-risk");
+  }
+  if (Array.isArray(features.suspicious_keywords) && features.suspicious_keywords.length === 0) {
+    rows.push("No suspicious keywords were detected");
+  }
+
+  if (!rows.length) {
+    return `
+      <div class="factor-row">
+        <span class="factor-icon factor-warn">!</span>
+        <span class="factor-text">No strong positive URL-level signals were detected.</span>
+        <span class="factor-points">-</span>
+      </div>
+    `;
+  }
+
+  return rows
+    .map(
+      (row) => `
+        <div class="factor-row">
+          <span class="factor-icon factor-good">✓</span>
+          <span class="factor-text">${row}</span>
+          <span class="factor-points factor-points-good">OK</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildFactRows(features) {
+  const facts = [
+    ["Hostname", features.hostname || "Unknown"],
+    ["Subdomains", features.subdomain_count ?? "Unknown"],
+    ["Query Params", features.query_parameter_count ?? "Unknown"],
+    ["Path Depth", features.path_depth ?? "Unknown"],
+    ["Encoded Chars", features.has_encoded_characters ? "Yes" : "No"],
+    [
+      "Keywords",
+      Array.isArray(features.suspicious_keywords) && features.suspicious_keywords.length
+        ? features.suspicious_keywords.join(", ")
+        : "None",
+    ],
+  ];
+
+  return facts
+    .map(
+      ([label, value]) => `
+        <div class="fact-item">
+          <p class="fact-label">${label}</p>
+          <p class="fact-value">${value}</p>
+        </div>
+      `
+    )
     .join("");
 }
 
