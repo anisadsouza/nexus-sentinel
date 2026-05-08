@@ -188,6 +188,10 @@ h1 {
   font-size: 14px;
 }
 
+.form-message.success {
+  color: var(--green-text);
+}
+
 .theme-toggle {
   width: 44px;
   min-width: 44px;
@@ -302,6 +306,11 @@ button {
   cursor: pointer;
   border-radius: 6px;
   font-weight: 700;
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.8;
 }
 
 button.secondary {

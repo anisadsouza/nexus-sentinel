@@ -8,6 +8,7 @@ const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
 const formMessage = document.getElementById("form-message");
+const analyzeButton = document.getElementById("analyze-button");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
@@ -38,9 +39,10 @@ form.addEventListener("submit", async (event) => {
   }
 
   urlInput.value = url;
-  formMessage.textContent = "Analysis request ready.";
+  formMessage.textContent = "Analysis in progress.";
   formMessage.className = "form-message muted";
   result.innerHTML = '<p class="muted">Analyzing...</p>';
+  setAnalyzeButtonState(true);
 
   try {
     const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
@@ -54,8 +56,14 @@ form.addEventListener("submit", async (event) => {
     await loadCampaigns();
     selectedRecentScanIndex = 0;
     highlightSelectedRecentScan();
+    formMessage.textContent = "Analysis complete.";
+    formMessage.className = "form-message success";
   } catch (error) {
+    formMessage.textContent = error.message;
+    formMessage.className = "form-message error";
     result.innerHTML = `<p class="error">${error.message}</p>`;
+  } finally {
+    setAnalyzeButtonState(false);
   }
 });
 
@@ -231,6 +239,11 @@ function highlightSelectedRecentScan() {
     const isSelected = Number(element.dataset.scanIndex) === selectedRecentScanIndex;
     element.classList.toggle("recent-item-selected", isSelected);
   });
+}
+
+function setAnalyzeButtonState(isLoading) {
+  analyzeButton.disabled = isLoading;
+  analyzeButton.textContent = isLoading ? "Analyzing..." : "Analyze";
 }
 
 function renderOverview(scans, campaignList) {
