@@ -196,5 +196,5 @@ def _shared_traits(records: list[AnalysisRecord]) -> list[str]:
 def _grouping_reason(campaign: dict[str, object]) -> str:
     shared_traits = list(campaign.get("shared_traits", ()))
     if shared_traits:
-        return "Grouped by the same URL pattern and repeated traits."
-    return "Grouped by an exact matching URL pattern fingerprint."
+        return "This group matches the same suspicious link pattern and repeated signs."
+    return "This group matches the same suspicious link pattern."

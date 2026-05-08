@@ -418,6 +418,31 @@ button.secondary {
   border-radius: 8px;
   position: sticky;
   top: 24px;
+  overflow: hidden;
+}
+
+.tips-card::before {
+  content: "";
+  display: block;
+  height: 4px;
+  margin: -20px -20px 18px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    color-mix(in srgb, var(--accent) 65%, white) 100%
+  );
+}
+
+[data-theme="dark"] .tips-card::before {
+  background: linear-gradient(
+    90deg,
+    var(--accent-strong) 0%,
+    color-mix(in srgb, var(--accent) 75%, black) 100%
+  );
+}
+
+.tips-section h2 {
+  color: var(--accent-strong);
 }
 
 .tips-list {
@@ -875,6 +900,55 @@ button.secondary {
   font-weight: 600;
   font-family: "SFMono-Regular", Consolas, monospace;
   color: var(--muted);
+}
+
+.advanced-details {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.advanced-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-details summary::after {
+  content: " +";
+  color: var(--label);
+}
+
+.advanced-details[open] summary::after {
+  content: " -";
+}
+
+.advanced-detail-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.advanced-detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.advanced-detail-row span:last-child {
+  font-family: "SFMono-Regular", Consolas, monospace;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-align: right;
 }
 
 @media (max-width: 700px) {

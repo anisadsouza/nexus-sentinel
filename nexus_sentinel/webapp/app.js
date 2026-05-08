@@ -88,23 +88,23 @@ async function loadCampaigns() {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error || "Could not load campaigns.");
+      throw new Error(data.error || "Could not load similar threat matches.");
     }
 
     if (!data.campaigns.length) {
-      campaigns.innerHTML = '<p class="muted">No campaign data yet.</p>';
+      campaigns.innerHTML = '<p class="muted">No similar threat matches yet.</p>';
     } else {
       campaigns.innerHTML = data.campaigns
         .map(
           (campaign) => `
             <article class="campaign-item">
               <div class="campaign-topline">
-                <p class="campaign-id">${campaign.campaign_id}</p>
+                <p class="campaign-id">Similar threat group</p>
                 <span class="risk-pill ${statusClass(campaign.classification)}">${sentenceCase(campaign.classification)}</span>
               </div>
-              <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
+              <p class="campaign-meta">Matched links: ${campaign.size}</p>
               <p class="campaign-meta">First seen: ${formatTimestamp(campaign.first_seen)}</p>
-              <p class="campaign-meta">Latest seen: ${formatTimestamp(campaign.latest_seen)}</p>
+              <p class="campaign-meta">Last seen: ${formatTimestamp(campaign.latest_seen)}</p>
               <p class="campaign-detail">${campaign.grouping_reason}</p>
               <div class="signal-pill-row">
                 ${renderCampaignSignals(campaign)}
@@ -114,6 +114,12 @@ async function loadCampaigns() {
                   .map((url) => `<span class="url-pill">${url}</span>`)
                   .join("")}
               </div>
+              <details class="advanced-details">
+                <summary>More details</summary>
+                <div class="advanced-detail-grid">
+                  <p class="advanced-detail-row"><span>Threat group ID</span><span>${campaign.campaign_id}</span></p>
+                </div>
+              </details>
             </article>
           `
         )
@@ -165,7 +171,7 @@ function renderResult(data) {
       </div>
 
       <div class="verdict-column">
-        <p class="section-kicker">Verdict</p>
+        <p class="section-kicker">Result</p>
         <div class="verdict-card ${verdictTone}">
           <div class="verdict-icon">${verdictIcon(data.classification)}</div>
           <div>
@@ -176,27 +182,26 @@ function renderResult(data) {
           </div>
         </div>
         <div class="meta-strip">
-          <span class="meta-pill">${data.campaign_id}</span>
-          <span class="meta-pill">Campaign size ${data.campaign_size}</span>
+          <span class="meta-pill">Similar links ${data.campaign_size}</span>
         </div>
       </div>
     </div>
     <div class="explanation-grid">
       <section class="explanation-card">
-        <p class="section-kicker">Detected Risks</p>
+        <p class="section-kicker">Why it was flagged</p>
         <div class="factor-list compact">${riskRows}</div>
       </section>
       <section class="explanation-card">
-        <p class="section-kicker">Positive Signals</p>
+        <p class="section-kicker">Good signs</p>
         <div class="factor-list compact">${goodRows}</div>
       </section>
       <section class="explanation-card explanation-card-facts">
-        <p class="section-kicker">Observed Facts</p>
+        <p class="section-kicker">Link details</p>
         <div class="fact-grid">${factRows}</div>
       </section>
     </div>
     <section class="content-card">
-      <p class="section-kicker">Content Analysis</p>
+      <p class="section-kicker">Page check</p>
       <div class="content-status-row">
         <span class="risk-pill ${contentAnalysis.status === "not_fetched" ? "status-suspicious" : "status-safe"}">
           ${sentenceCase(contentAnalysis.status || "unknown")}
@@ -206,7 +211,7 @@ function renderResult(data) {
       <div class="fact-grid">${contentRows}</div>
     </section>
     <section class="content-card">
-      <p class="section-kicker">Redirect Analysis</p>
+      <p class="section-kicker">Destination check</p>
       <div class="content-status-row">
         <span class="risk-pill ${redirectAnalysis.status === "not_fetched" ? "status-suspicious" : "status-safe"}">
           ${sentenceCase(redirectAnalysis.status || "unknown")}
@@ -216,11 +221,18 @@ function renderResult(data) {
       <div class="fact-grid">${redirectRows}</div>
     </section>
     <section class="content-card info-card">
-      <p class="section-kicker">Tips</p>
+      <p class="section-kicker">What to know</p>
       <div class="info-list">
         ${tipsMarkup}
       </div>
     </section>
+    <details class="advanced-details advanced-details-result">
+      <summary>More details</summary>
+      <div class="advanced-detail-grid">
+        <p class="advanced-detail-row"><span>Threat group ID</span><span>${data.campaign_id}</span></p>
+        <p class="advanced-detail-row"><span>Classification</span><span>${sentenceCase(data.classification)}</span></p>
+      </div>
+    </details>
   `;
 }
 
@@ -376,13 +388,13 @@ function buildGoodSignalRows(features) {
 
 function buildFactRows(features) {
   const facts = [
-    ["Hostname", features.hostname || "Unknown"],
-    ["Subdomains", features.subdomain_count ?? "Unknown"],
-    ["Query Params", features.query_parameter_count ?? "Unknown"],
-    ["Path Depth", features.path_depth ?? "Unknown"],
-    ["Encoded Chars", features.has_encoded_characters ? "Yes" : "No"],
+    ["Website name", features.hostname || "Unknown"],
+    ["Extra subdomains", features.subdomain_count ?? "Unknown"],
+    ["Query items", features.query_parameter_count ?? "Unknown"],
+    ["Path depth", features.path_depth ?? "Unknown"],
+    ["Encoded characters", features.has_encoded_characters ? "Yes" : "No"],
     [
-      "Keywords",
+      "Suspicious words",
       Array.isArray(features.suspicious_keywords) && features.suspicious_keywords.length
         ? features.suspicious_keywords.join(", ")
         : "None",
@@ -403,11 +415,11 @@ function buildFactRows(features) {
 
 function buildContentRows(contentAnalysis) {
   const contentFacts = [
-    ["Page Title", contentAnalysis.page_title || "Not fetched"],
-    ["Login Form", booleanLabel(contentAnalysis.login_form_detected)],
-    ["Password Field", booleanLabel(contentAnalysis.password_field_detected)],
-    ["Urgency Language", booleanLabel(contentAnalysis.urgency_language_detected)],
-    ["External Scripts", booleanLabel(contentAnalysis.external_scripts_detected)],
+    ["Page title", contentAnalysis.page_title || "Not fetched"],
+    ["Login form", booleanLabel(contentAnalysis.login_form_detected)],
+    ["Password field", booleanLabel(contentAnalysis.password_field_detected)],
+    ["Urgency wording", booleanLabel(contentAnalysis.urgency_language_detected)],
+    ["Outside scripts", booleanLabel(contentAnalysis.external_scripts_detected)],
   ];
 
   return contentFacts
@@ -424,14 +436,14 @@ function buildContentRows(contentAnalysis) {
 
 function buildRedirectRows(redirectAnalysis) {
   const redirectFacts = [
-    ["Redirect Count", redirectAnalysis.redirect_count ?? "Not fetched"],
-    ["Final URL", redirectAnalysis.final_url || "Not fetched"],
+    ["Redirect count", redirectAnalysis.redirect_count ?? "Not fetched"],
+    ["Final destination", redirectAnalysis.final_url || "Not fetched"],
     [
-      "Cross-domain Redirect",
+      "Different-site redirect",
       booleanLabel(redirectAnalysis.cross_domain_redirect_detected),
     ],
     [
-      "Suspicious Chain",
+      "Suspicious redirect chain",
       booleanLabel(redirectAnalysis.suspicious_redirect_chain),
     ],
   ];
@@ -450,7 +462,7 @@ function buildRedirectRows(redirectAnalysis) {
 
 function buildTips(data, features) {
   const tips = [
-    "Each run is still saved as a new scan, so the timestamp, recent history, and campaign size can change.",
+    "Each run is still saved as a new scan, so the timestamp and similar-link count can change.",
   ];
 
   if (data.classification === "safe") {
