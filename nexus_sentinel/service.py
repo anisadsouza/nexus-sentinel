@@ -68,18 +68,29 @@ class AnalysisService:
                     "size": 0,
                     "example_urls": [],
                     "common_risk_factors": [],
+                    "shared_traits": [],
+                    "grouping_reason": "",
+                    "first_seen": record.analyzed_at,
+                    "latest_seen": record.analyzed_at,
                 },
             )
             campaign["size"] = int(campaign["size"]) + 1
             example_urls = campaign["example_urls"]
             if len(example_urls) < 3:
                 example_urls.append(record.url)
+            campaign["first_seen"] = min(str(campaign["first_seen"]), record.analyzed_at)
+            campaign["latest_seen"] = max(
+                str(campaign["latest_seen"]), record.analyzed_at
+            )
 
         for campaign in grouped.values():
+            campaign_records = [
+                record
+                for record in self._records
+                if record.campaign_id == campaign["campaign_id"]
+            ]
             factor_counts: dict[str, int] = {}
-            for record in self._records:
-                if record.campaign_id != campaign["campaign_id"]:
-                    continue
+            for record in campaign_records:
                 for factor in record.risk_factors:
                     factor_counts[factor] = factor_counts.get(factor, 0) + 1
             campaign["common_risk_factors"] = [
@@ -89,6 +100,8 @@ class AnalysisService:
                     key=lambda item: (-item[1], item[0]),
                 )[:2]
             ]
+            campaign["shared_traits"] = _shared_traits(campaign_records)
+            campaign["grouping_reason"] = _grouping_reason(campaign)
 
         return sorted(
             grouped.values(),
@@ -139,3 +152,39 @@ def _campaign_id_for(threat_fingerprint_id: str) -> str:
 
 def _timestamp_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _shared_traits(records: list[AnalysisRecord]) -> list[str]:
+    if not records:
+        return []
+
+    features = [record.extracted_features for record in records]
+    traits: list[str] = []
+
+    if all(feature.get("uses_https") is False for feature in features):
+        traits.append("No HTTPS across scans")
+    if all(feature.get("is_ip_hostname") is True for feature in features):
+        traits.append("IP-based hostnames")
+    if all(feature.get("has_suspicious_tld") is True for feature in features):
+        traits.append("High-risk TLDs")
+    if all((feature.get("subdomain_count") or 0) >= 3 for feature in features):
+        traits.append("Many subdomains")
+
+    keyword_sets = [
+        set(feature.get("suspicious_keywords", ()))
+        for feature in features
+        if feature.get("suspicious_keywords")
+    ]
+    if keyword_sets:
+        shared_keywords = sorted(set.intersection(*keyword_sets))
+        if shared_keywords:
+            traits.append("Shared keywords: " + ", ".join(shared_keywords[:2]))
+
+    return traits[:3]
+
+
+def _grouping_reason(campaign: dict[str, object]) -> str:
+    shared_traits = list(campaign.get("shared_traits", ()))
+    if shared_traits:
+        return "Grouped by the same URL pattern and repeated traits."
+    return "Grouped by an exact matching URL pattern fingerprint."

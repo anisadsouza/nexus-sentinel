@@ -26,6 +26,9 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertEqual(len(campaigns), 1)
         self.assertEqual(campaigns[0]["size"], 2)
         self.assertTrue(campaigns[0]["common_risk_factors"])
+        self.assertIn("first_seen", campaigns[0])
+        self.assertIn("latest_seen", campaigns[0])
+        self.assertTrue(campaigns[0]["grouping_reason"])
 
     def test_recent_scans_returns_latest_first(self) -> None:
         service = AnalysisService()

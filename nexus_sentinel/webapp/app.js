@@ -123,6 +123,9 @@ async function loadCampaigns() {
                 <span class="risk-pill ${statusClass(campaign.classification)}">${sentenceCase(campaign.classification)}</span>
               </div>
               <p class="campaign-meta">Matched URLs: ${campaign.size}</p>
+              <p class="campaign-meta">First seen: ${formatTimestamp(campaign.first_seen)}</p>
+              <p class="campaign-meta">Latest seen: ${formatTimestamp(campaign.latest_seen)}</p>
+              <p class="campaign-detail">${campaign.grouping_reason}</p>
               <div class="signal-pill-row">
                 ${renderCampaignSignals(campaign)}
               </div>
@@ -594,14 +597,22 @@ function renderCampaignSignals(campaign) {
   const repeatedSignals = Array.isArray(campaign.common_risk_factors)
     ? campaign.common_risk_factors
     : [];
+  const sharedTraits = Array.isArray(campaign.shared_traits) ? campaign.shared_traits : [];
+  const signals = [...sharedTraits, ...repeatedSignals];
 
-  if (!repeatedSignals.length) {
+  if (!signals.length) {
     return '<span class="signal-pill signal-good">Stable pattern</span>';
   }
 
-  return repeatedSignals
+  return signals
     .map((signal) => {
-      const tone = signal.toLowerCase().includes("https") ? "signal-good" : "signal-bad";
+      const normalizedSignal = signal.toLowerCase();
+      const tone =
+        normalizedSignal.includes("https") ||
+        normalizedSignal.includes("shared") ||
+        normalizedSignal.includes("stable")
+          ? "signal-good"
+          : "signal-bad";
       return `<span class="signal-pill ${tone}">${signal}</span>`;
     })
     .join("");

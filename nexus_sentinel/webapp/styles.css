@@ -448,6 +448,13 @@ button.secondary {
   font-weight: 400;
 }
 
+.campaign-detail {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .campaign-id {
   margin-bottom: 0;
   font-size: 16px;

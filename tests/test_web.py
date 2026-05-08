@@ -38,6 +38,28 @@ class DashboardAppTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertIn("required", payload["error"])
 
+    def test_campaigns_endpoint_returns_campaign_summary_fields(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+            _run_app(
+                app,
+                path="/api/analyze",
+                query_string=(
+                    "url=http%3A%2F%2Fsecure-login.example.com.verify-account.test"
+                    "%2Freset%3Fuser%3D1%26a%3D2%26b%3D3%26c%3D4%26d%3D5"
+                ),
+            )
+
+            status, headers, body = _run_app(app, path="/api/campaigns")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertEqual(len(payload["campaigns"]), 1)
+        self.assertIn("first_seen", payload["campaigns"][0])
+        self.assertIn("latest_seen", payload["campaigns"][0])
+        self.assertIn("grouping_reason", payload["campaigns"][0])
+
 
 def _run_app(
     app: DashboardApp, path: str, query_string: str = "", method: str = "GET"
