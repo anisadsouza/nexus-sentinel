@@ -181,7 +181,6 @@ function renderResult(data) {
         </div>
         <div class="factor-list">${factorRows}</div>
         <div class="meta-strip">
-          <span class="meta-pill">${data.threat_fingerprint_id}</span>
           <span class="meta-pill">${data.campaign_id}</span>
           <span class="meta-pill">Campaign size ${data.campaign_size}</span>
         </div>
@@ -382,7 +381,7 @@ function renderCampaignSignals(campaign) {
     : [];
 
   if (!repeatedSignals.length) {
-    return '<span class="signal-pill signal-good">Stable fingerprint</span>';
+    return '<span class="signal-pill signal-good">Stable pattern</span>';
   }
 
   return repeatedSignals
