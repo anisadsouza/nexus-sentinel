@@ -22,7 +22,7 @@ class DashboardAppTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertEqual(payload["url"], "https://example.com/login")
         self.assertIn("risk_score", payload)
-        self.assertIn("campaign_id", payload)
+        self.assertIn("similar_group_id", payload)
         self.assertIn("extracted_features", payload)
         self.assertIn("score_breakdown", payload)
         self.assertIn("content_analysis", payload)
@@ -38,7 +38,7 @@ class DashboardAppTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertIn("required", payload["error"])
 
-    def test_campaigns_endpoint_returns_campaign_summary_fields(self) -> None:
+    def test_similar_groups_endpoint_returns_summary_fields(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
             _run_app(
@@ -50,17 +50,18 @@ class DashboardAppTests(unittest.TestCase):
                 ),
             )
 
-            status, headers, body = _run_app(app, path="/api/campaigns")
+            status, headers, body = _run_app(app, path="/api/similar-groups")
 
         self.assertEqual(status, "200 OK")
         self.assertEqual(headers["Content-Type"], "application/json")
         payload = json.loads(body)
-        self.assertEqual(len(payload["campaigns"]), 1)
+        self.assertEqual(len(payload["similar_groups"]), 1)
         self.assertIn("overview", payload)
         self.assertIn("total_scans", payload["overview"])
-        self.assertIn("first_seen", payload["campaigns"][0])
-        self.assertIn("latest_seen", payload["campaigns"][0])
-        self.assertIn("grouping_reason", payload["campaigns"][0])
+        self.assertIn("active_similar_groups", payload["overview"])
+        self.assertIn("first_seen", payload["similar_groups"][0])
+        self.assertIn("latest_seen", payload["similar_groups"][0])
+        self.assertIn("grouping_reason", payload["similar_groups"][0])
 
     def test_private_analyze_request_does_not_persist_scan(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -72,7 +73,7 @@ class DashboardAppTests(unittest.TestCase):
                 query_string="url=https%3A%2F%2Fexample.com%2Flogin&private=1",
             )
             campaign_status, _campaign_headers, campaign_body = _run_app(
-                app, path="/api/campaigns"
+                app, path="/api/similar-groups"
             )
 
         self.assertEqual(status, "200 OK")
@@ -83,6 +84,27 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(campaign_status, "200 OK")
         campaign_payload = json.loads(campaign_body)
         self.assertEqual(campaign_payload["overview"]["total_scans"], 0)
+
+    def test_clear_history_endpoint_removes_saved_scans(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+            _run_app(
+                app,
+                path="/api/analyze",
+                query_string="url=https%3A%2F%2Fexample.com%2Flogin",
+            )
+
+            clear_status, clear_headers, clear_body = _run_app(
+                app, path="/api/history/clear", method="POST"
+            )
+            status, _headers, body = _run_app(app, path="/api/similar-groups")
+
+        self.assertEqual(clear_status, "200 OK")
+        self.assertEqual(clear_headers["Content-Type"], "application/json")
+        self.assertTrue(json.loads(clear_body)["ok"])
+        payload = json.loads(body)
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(payload["overview"]["total_scans"], 0)
 
 
 def _run_app(

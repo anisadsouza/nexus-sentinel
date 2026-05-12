@@ -90,40 +90,40 @@ refreshButton.addEventListener("click", () => {
 
 async function loadCampaigns() {
   try {
-    const response = await fetch("/api/campaigns");
+    const response = await fetch("/api/similar-groups");
     const data = await response.json();
 
     if (!response.ok) {
       throw new Error(data.error || "Could not load similar threat matches.");
     }
 
-    if (!data.campaigns.length) {
+    if (!data.similar_groups.length) {
       campaigns.innerHTML = '<p class="muted">No similar threat matches yet.</p>';
     } else {
-      campaigns.innerHTML = data.campaigns
+      campaigns.innerHTML = data.similar_groups
         .map(
-          (campaign) => `
+          (similarGroup) => `
             <article class="campaign-item">
               <div class="campaign-topline">
                 <p class="campaign-id">Similar threat group</p>
-                <span class="risk-pill ${statusClass(campaign.classification)}">${sentenceCase(campaign.classification)}</span>
+                <span class="risk-pill ${statusClass(similarGroup.classification)}">${sentenceCase(similarGroup.classification)}</span>
               </div>
-              <p class="campaign-meta">Matched links: ${campaign.size}</p>
-              <p class="campaign-meta">First seen: ${formatTimestamp(campaign.first_seen)}</p>
-              <p class="campaign-meta">Last seen: ${formatTimestamp(campaign.latest_seen)}</p>
-              <p class="campaign-detail">${campaign.grouping_reason}</p>
+              <p class="campaign-meta">Matched links: ${similarGroup.size}</p>
+              <p class="campaign-meta">First seen: ${formatTimestamp(similarGroup.first_seen)}</p>
+              <p class="campaign-meta">Last seen: ${formatTimestamp(similarGroup.latest_seen)}</p>
+              <p class="campaign-detail">${similarGroup.grouping_reason}</p>
               <div class="signal-pill-row">
-                ${renderCampaignSignals(campaign)}
+                ${renderCampaignSignals(similarGroup)}
               </div>
               <div class="url-pill-row">
-                ${campaign.example_urls
+                ${similarGroup.example_urls
                   .map((url) => `<span class="url-pill">${url}</span>`)
                   .join("")}
               </div>
               <details class="advanced-details">
                 <summary>More details</summary>
                 <div class="advanced-detail-grid">
-                  <p class="advanced-detail-row"><span>Threat group ID</span><span>${campaign.campaign_id}</span></p>
+                  <p class="advanced-detail-row"><span>Threat group ID</span><span>${similarGroup.similar_group_id}</span></p>
                 </div>
               </details>
             </article>
@@ -188,7 +188,7 @@ function renderResult(data) {
           </div>
         </div>
         <div class="meta-strip">
-          <span class="meta-pill">Similar links ${data.campaign_size}</span>
+          <span class="meta-pill">Similar links ${data.similar_group_size}</span>
           <span class="meta-pill">${data.saved_to_history ? "Saved to history" : "Private scan"}</span>
         </div>
       </div>
@@ -236,7 +236,7 @@ function renderResult(data) {
     <details class="advanced-details advanced-details-result">
       <summary>More details</summary>
       <div class="advanced-detail-grid">
-        <p class="advanced-detail-row"><span>Threat group ID</span><span>${data.campaign_id}</span></p>
+        <p class="advanced-detail-row"><span>Threat group ID</span><span>${data.similar_group_id}</span></p>
         <p class="advanced-detail-row"><span>Classification</span><span>${sentenceCase(data.classification)}</span></p>
       </div>
     </details>
@@ -250,7 +250,7 @@ function setAnalyzeButtonState(isLoading) {
 
 function renderOverview(overview) {
   totalScans.textContent = String(overview.total_scans || 0);
-  activeCampaigns.textContent = String(overview.active_campaigns || 0);
+  activeCampaigns.textContent = String(overview.active_similar_groups || 0);
   highestRisk.textContent = String(overview.highest_risk || 0);
 }
 
@@ -534,11 +534,13 @@ function sentenceCase(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function renderCampaignSignals(campaign) {
-  const repeatedSignals = Array.isArray(campaign.common_risk_factors)
-    ? campaign.common_risk_factors
+function renderCampaignSignals(similarGroup) {
+  const repeatedSignals = Array.isArray(similarGroup.common_risk_factors)
+    ? similarGroup.common_risk_factors
     : [];
-  const sharedTraits = Array.isArray(campaign.shared_traits) ? campaign.shared_traits : [];
+  const sharedTraits = Array.isArray(similarGroup.shared_traits)
+    ? similarGroup.shared_traits
+    : [];
   const signals = [...sharedTraits, ...repeatedSignals];
 
   if (!signals.length) {

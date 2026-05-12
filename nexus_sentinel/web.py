@@ -9,7 +9,7 @@ from nexus_sentinel.service import AnalysisService
 
 
 ASSET_DIR = Path(__file__).parent / "webapp"
-DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.sqlite3"
+DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.json"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9010
 
@@ -33,7 +33,7 @@ class DashboardApp:
             return self._json_response(
                 start_response,
                 405,
-                {"error": "Only GET requests are supported right now."},
+                {"error": "Only GET and POST requests are supported right now."},
             )
 
         if path == "/":
