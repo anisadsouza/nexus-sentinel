@@ -53,6 +53,15 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertEqual(overview["active_campaigns"], 2)
         self.assertGreaterEqual(overview["highest_risk"], 1)
 
+    def test_private_scan_is_not_saved_to_history(self) -> None:
+        service = AnalysisService()
+
+        record = service.analyze("http://192.168.1.5/login", save=False)
+
+        self.assertFalse(record.saved_to_history)
+        self.assertEqual(service.overview()["total_scans"], 0)
+        self.assertEqual(service.recent_scans(), [])
+
     def test_records_persist_when_storage_path_is_used(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             storage_path = Path(tmp_dir) / "history.json"
@@ -66,6 +75,7 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertEqual(len(scans), 1)
             self.assertEqual(scans[0]["url"], saved.url)
             self.assertEqual(scans[0]["campaign_id"], saved.campaign_id)
+            self.assertTrue(scans[0]["saved_to_history"])
             self.assertIn("extracted_features", scans[0])
             self.assertIn("score_breakdown", scans[0])
             self.assertIn("content_analysis", scans[0])

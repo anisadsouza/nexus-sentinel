@@ -53,13 +53,19 @@ class DashboardApp:
     def _handle_analyze(self, environ: dict, start_response) -> list[bytes]:
         query = parse_qs(environ.get("QUERY_STRING", ""))
         url = (query.get("url") or [""])[0].strip()
+        private_scan = (query.get("private") or ["0"])[0].strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
         if not url:
             return self._json_response(
                 start_response, 400, {"error": "A url query parameter is required."}
             )
 
-        record = self._service.analyze(url)
+        record = self._service.analyze(url, save=not private_scan)
         return self._json_response(start_response, 200, record.to_dict())
 
     def _file_response(

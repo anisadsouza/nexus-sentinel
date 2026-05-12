@@ -11,6 +11,7 @@ from nexus_sentinel.detector import analyze_url
 class AnalysisRecord:
     url: str
     analyzed_at: str
+    saved_to_history: bool
     risk_score: int
     classification: str
     risk_factors: tuple[str, ...]
@@ -30,7 +31,7 @@ class AnalysisService:
         self._storage_path = Path(storage_path) if storage_path else None
         self._records = self._load_records()
 
-    def analyze(self, url: str) -> AnalysisRecord:
+    def analyze(self, url: str, save: bool = True) -> AnalysisRecord:
         detection = analyze_url(url)
         campaign_id = _campaign_id_for(detection.extracted_features)
         campaign_size = (
@@ -40,6 +41,7 @@ class AnalysisService:
         record = AnalysisRecord(
             url=url,
             analyzed_at=_timestamp_now(),
+            saved_to_history=save,
             risk_score=detection.risk_score,
             classification=detection.classification,
             risk_factors=detection.risk_factors,
@@ -50,8 +52,9 @@ class AnalysisService:
             campaign_id=campaign_id,
             campaign_size=campaign_size,
         )
-        self._records.append(record)
-        self._save_records()
+        if save:
+            self._records.append(record)
+            self._save_records()
         return record
 
     def list_campaigns(self) -> list[dict[str, object]]:
@@ -128,6 +131,7 @@ class AnalysisService:
             AnalysisRecord(
                 url=item["url"],
                 analyzed_at=item.get("analyzed_at", _timestamp_now()),
+                saved_to_history=bool(item.get("saved_to_history", True)),
                 risk_score=item["risk_score"],
                 classification=item["classification"],
                 risk_factors=tuple(item["risk_factors"]),

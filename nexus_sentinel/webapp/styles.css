@@ -190,6 +190,24 @@ h1 {
   max-width: 1080px;
 }
 
+.privacy-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.privacy-toggle input {
+  width: 16px;
+  height: 16px;
+  min-height: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
 .form-message {
   min-height: 18px;
   margin-bottom: 0;

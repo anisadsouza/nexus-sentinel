@@ -11,6 +11,7 @@ const analyzeButton = document.getElementById("analyze-button");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
+const privateScanToggle = document.getElementById("private-scan");
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
 
 applyTheme(loadThemePreference());
@@ -40,9 +41,12 @@ form.addEventListener("submit", async (event) => {
   formMessage.className = "form-message muted";
   result.innerHTML = '<p class="muted">Analyzing...</p>';
   setAnalyzeButtonState(true);
+  const privateScan = privateScanToggle.checked;
 
   try {
-    const response = await fetch(`/api/analyze?url=${encodeURIComponent(url)}`);
+    const response = await fetch(
+      `/api/analyze?url=${encodeURIComponent(url)}&private=${privateScan ? "1" : "0"}`
+    );
     const data = await response.json();
 
     if (!response.ok) {
@@ -51,7 +55,9 @@ form.addEventListener("submit", async (event) => {
 
     renderResult(data);
     await loadCampaigns();
-    formMessage.textContent = "Analysis complete.";
+    formMessage.textContent = data.saved_to_history
+      ? "Analysis complete. Scan saved."
+      : "Analysis complete. Scan kept private.";
     formMessage.className = "form-message success";
   } catch (error) {
     formMessage.textContent = error.message;
@@ -183,6 +189,7 @@ function renderResult(data) {
         </div>
         <div class="meta-strip">
           <span class="meta-pill">Similar links ${data.campaign_size}</span>
+          <span class="meta-pill">${data.saved_to_history ? "Saved to history" : "Private scan"}</span>
         </div>
       </div>
     </div>
@@ -462,7 +469,9 @@ function buildRedirectRows(redirectAnalysis) {
 
 function buildTips(data, features) {
   const tips = [
-    "Each run is still saved as a new scan, so the timestamp and similar-link count can change.",
+    data.saved_to_history
+      ? "This scan was saved to history, so the timestamp and similar-link count can change over time."
+      : "This scan was kept private and was not added to shared history.",
   ];
 
   if (data.classification === "safe") {

@@ -62,6 +62,28 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("latest_seen", payload["campaigns"][0])
         self.assertIn("grouping_reason", payload["campaigns"][0])
 
+    def test_private_analyze_request_does_not_persist_scan(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+
+            status, headers, body = _run_app(
+                app,
+                path="/api/analyze",
+                query_string="url=https%3A%2F%2Fexample.com%2Flogin&private=1",
+            )
+            campaign_status, _campaign_headers, campaign_body = _run_app(
+                app, path="/api/campaigns"
+            )
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertFalse(payload["saved_to_history"])
+
+        self.assertEqual(campaign_status, "200 OK")
+        campaign_payload = json.loads(campaign_body)
+        self.assertEqual(campaign_payload["overview"]["total_scans"], 0)
+
 
 def _run_app(
     app: DashboardApp, path: str, query_string: str = "", method: str = "GET"
