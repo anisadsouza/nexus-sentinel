@@ -137,10 +137,6 @@ class AnalysisService:
             "highest_risk": max(risk_scores, default=0),
         }
 
-    def clear_saved_history(self) -> None:
-        self._records = []
-        self._save_records()
-
     def _load_records(self) -> list[AnalysisRecord]:
         if not self._storage_path or not self._storage_path.exists():
             return []

@@ -38,6 +38,20 @@ class DashboardAppTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertIn("required", payload["error"])
 
+    def test_analyze_endpoint_rejects_plain_text_instead_of_url(self) -> None:
+        app = DashboardApp()
+
+        status, headers, body = _run_app(
+            app,
+            path="/api/analyze",
+            query_string="url=hello",
+        )
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertIn("Enter a full URL or link", payload["error"])
+
     def test_similar_groups_endpoint_returns_summary_fields(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
@@ -85,26 +99,17 @@ class DashboardAppTests(unittest.TestCase):
         campaign_payload = json.loads(campaign_body)
         self.assertEqual(campaign_payload["overview"]["total_scans"], 0)
 
-    def test_clear_history_endpoint_removes_saved_scans(self) -> None:
-        with TemporaryDirectory() as tmp_dir:
-            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
-            _run_app(
-                app,
-                path="/api/analyze",
-                query_string="url=https%3A%2F%2Fexample.com%2Flogin",
-            )
+    def test_clear_history_endpoint_is_not_available(self) -> None:
+        app = DashboardApp()
 
-            clear_status, clear_headers, clear_body = _run_app(
-                app, path="/api/history/clear", method="POST"
-            )
-            status, _headers, body = _run_app(app, path="/api/similar-groups")
+        status, headers, body = _run_app(
+            app, path="/api/history/clear", method="POST"
+        )
 
-        self.assertEqual(clear_status, "200 OK")
-        self.assertEqual(clear_headers["Content-Type"], "application/json")
-        self.assertTrue(json.loads(clear_body)["ok"])
+        self.assertEqual(status, "404 Not Found")
+        self.assertEqual(headers["Content-Type"], "application/json")
         payload = json.loads(body)
-        self.assertEqual(status, "200 OK")
-        self.assertEqual(payload["overview"]["total_scans"], 0)
+        self.assertIn("Not found", payload["error"])
 
 
 def _run_app(

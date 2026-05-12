@@ -3,7 +3,6 @@ const urlInput = document.getElementById("url-input");
 const result = document.getElementById("result");
 const campaigns = document.getElementById("campaigns");
 const refreshButton = document.getElementById("refresh-campaigns");
-const clearHistoryButton = document.getElementById("clear-history");
 const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
@@ -87,24 +86,6 @@ clearUrlButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void loadCampaigns();
-});
-
-clearHistoryButton.addEventListener("click", async () => {
-  try {
-    const response = await fetch("/api/history/clear", { method: "POST" });
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || "Could not clear saved history.");
-    }
-
-    formMessage.textContent = data.message || "Saved history cleared.";
-    formMessage.className = "form-message success";
-    await loadCampaigns();
-  } catch (error) {
-    formMessage.textContent = error.message;
-    formMessage.className = "form-message error";
-  }
 });
 
 async function loadCampaigns() {
@@ -286,7 +267,7 @@ function statusClass(classification) {
 function prepareUrl(rawValue) {
   const trimmed = rawValue.trim();
   if (!trimmed) {
-    return { ok: false, message: "Enter a URL to analyze." };
+    return { ok: false, message: "Enter a URL or link to analyze." };
   }
 
   const withScheme = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(trimmed)
@@ -295,13 +276,35 @@ function prepareUrl(rawValue) {
 
   try {
     const parsed = new URL(withScheme);
-    if (!parsed.hostname) {
-      return { ok: false, message: "Please enter a valid URL." };
+    if (!parsed.hostname || !_looksLikeLinkTarget(parsed.hostname)) {
+      return {
+        ok: false,
+        message: "Enter a full URL or link, such as https://example.com",
+      };
     }
     return { ok: true, url: parsed.toString() };
   } catch (_error) {
-    return { ok: false, message: "Please enter a valid URL." };
+    return {
+      ok: false,
+      message: "Enter a full URL or link, such as https://example.com",
+    };
   }
+}
+
+function _looksLikeLinkTarget(hostname) {
+  if (!hostname) {
+    return false;
+  }
+
+  if (hostname === "localhost") {
+    return true;
+  }
+
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(hostname)) {
+    return true;
+  }
+
+  return hostname.includes(".");
 }
 
 function formatTimestamp(timestamp) {

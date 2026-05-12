@@ -1,7 +1,8 @@
 import json
+from ipaddress import ip_address
 import socket
 from pathlib import Path
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlparse
 from wsgiref.simple_server import make_server
 
 from nexus_sentinel.live_checks import run_live_checks
@@ -55,14 +56,6 @@ class DashboardApp:
                     "overview": self._service.overview(),
                 },
             )
-        if path == "/api/history/clear" and method == "POST":
-            self._service.clear_saved_history()
-            return self._json_response(
-                start_response,
-                200,
-                {"ok": True, "message": "Saved history cleared."},
-            )
-
         return self._json_response(start_response, 404, {"error": "Not found"})
 
     def _handle_analyze(self, environ: dict, start_response) -> list[bytes]:
@@ -78,6 +71,13 @@ class DashboardApp:
         if not url:
             return self._json_response(
                 start_response, 400, {"error": "A url query parameter is required."}
+            )
+
+        if not _is_valid_submitted_url(url):
+            return self._json_response(
+                start_response,
+                400,
+                {"error": "Enter a full URL or link, such as https://example.com"},
             )
 
         record = self._service.analyze(url, save=not private_scan)
@@ -119,6 +119,26 @@ def _pick_available_address(host: str, starting_port: int) -> tuple[str, int]:
             if sock.connect_ex((host, port)) != 0:
                 return host, port
     raise RuntimeError("No open port found between 9010 and 9029.")
+
+
+def _is_valid_submitted_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url if "://" in url else f"https://{url}")
+    except ValueError:
+        return False
+
+    hostname = parsed.hostname or ""
+    if not hostname:
+        return False
+    if hostname == "localhost":
+        return True
+    if "." in hostname:
+        return True
+    try:
+        ip_address(hostname)
+    except ValueError:
+        return False
+    return True
 
 
 if __name__ == "__main__":
