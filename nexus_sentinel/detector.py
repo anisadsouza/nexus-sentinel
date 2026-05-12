@@ -1,6 +1,5 @@
 from dataclasses import asdict, dataclass
 
-from nexus_sentinel.fingerprint import generate_threat_fingerprint
 from nexus_sentinel.url_features import UrlFeatures, extract_url_features
 
 
@@ -9,7 +8,6 @@ class DetectionResult:
     risk_score: int
     classification: str
     risk_factors: tuple[str, ...]
-    threat_fingerprint_id: str
     extracted_features: dict[str, object]
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
@@ -27,7 +25,6 @@ def analyze_url(url: str) -> DetectionResult:
         risk_score=score,
         classification=_classify(score),
         risk_factors=tuple(factors),
-        threat_fingerprint_id=generate_threat_fingerprint(features),
         extracted_features=_serialize_features(features),
         score_breakdown=tuple(breakdown),
         content_analysis=_build_content_analysis_placeholder(),

@@ -1,3 +1,4 @@
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -13,7 +14,6 @@ class AnalysisRecord:
     risk_score: int
     classification: str
     risk_factors: tuple[str, ...]
-    threat_fingerprint_id: str
     extracted_features: dict[str, object]
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
@@ -32,7 +32,7 @@ class AnalysisService:
 
     def analyze(self, url: str) -> AnalysisRecord:
         detection = analyze_url(url)
-        campaign_id = _campaign_id_for(detection.threat_fingerprint_id)
+        campaign_id = _campaign_id_for(detection.extracted_features)
         campaign_size = (
             sum(1 for record in self._records if record.campaign_id == campaign_id) + 1
         )
@@ -43,7 +43,6 @@ class AnalysisService:
             risk_score=detection.risk_score,
             classification=detection.classification,
             risk_factors=detection.risk_factors,
-            threat_fingerprint_id=detection.threat_fingerprint_id,
             extracted_features=detection.extracted_features,
             score_breakdown=detection.score_breakdown,
             content_analysis=detection.content_analysis,
@@ -63,7 +62,6 @@ class AnalysisService:
                 record.campaign_id,
                 {
                     "campaign_id": record.campaign_id,
-                    "threat_fingerprint_id": record.threat_fingerprint_id,
                     "classification": record.classification,
                     "size": 0,
                     "example_urls": [],
@@ -133,7 +131,6 @@ class AnalysisService:
                 risk_score=item["risk_score"],
                 classification=item["classification"],
                 risk_factors=tuple(item["risk_factors"]),
-                threat_fingerprint_id=item["threat_fingerprint_id"],
                 extracted_features=dict(item.get("extracted_features", {})),
                 score_breakdown=tuple(item.get("score_breakdown", ())),
                 content_analysis=dict(item.get("content_analysis", {})),
@@ -156,12 +153,36 @@ class AnalysisService:
         )
 
 
-def _campaign_id_for(threat_fingerprint_id: str) -> str:
-    return "cmp_" + threat_fingerprint_id.removeprefix("fp_")
+def _campaign_id_for(features: dict[str, object]) -> str:
+    pattern = {
+        "has_encoded_characters": features.get("has_encoded_characters"),
+        "has_suspicious_tld": features.get("has_suspicious_tld"),
+        "hostname_hyphen_count": _bucket(int(features.get("hostname_hyphen_count", 0))),
+        "is_ip_hostname": features.get("is_ip_hostname"),
+        "keyword_count": len(features.get("suspicious_keywords", [])),
+        "keywords": features.get("suspicious_keywords", []),
+        "path_depth": _bucket(int(features.get("path_depth", 0))),
+        "query_parameter_count": _bucket(int(features.get("query_parameter_count", 0))),
+        "subdomain_count": _bucket(int(features.get("subdomain_count", 0))),
+        "url_length": _bucket(int(features.get("url_length", 0))),
+        "uses_https": features.get("uses_https"),
+    }
+    encoded = json.dumps(pattern, sort_keys=True).encode("utf-8")
+    return "cmp_" + hashlib.sha256(encoded).hexdigest()[:12]
 
 
 def _timestamp_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _bucket(value: int) -> str:
+    if value == 0:
+        return "none"
+    if value <= 2:
+        return "low"
+    if value <= 5:
+        return "medium"
+    return "high"
 
 
 def _shared_traits(records: list[AnalysisRecord]) -> list[str]:

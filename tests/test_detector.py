@@ -25,7 +25,6 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.classification, "suspicious")
         self.assertGreaterEqual(result.risk_score, 35)
         self.assertIn("URL does not use HTTPS", result.risk_factors)
-        self.assertTrue(result.threat_fingerprint_id.startswith("fp_"))
         self.assertTrue(any(item["rule"] == "no_https" for item in result.score_breakdown))
 
     def test_high_risk_tld_and_encoded_path_raise_score(self) -> None:
