@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass
 
 from nexus_sentinel.url_features import UrlFeatures, extract_url_features
@@ -18,8 +20,18 @@ class DetectionResult:
 
 
 def analyze_url(url: str) -> DetectionResult:
+    return analyze_url_with_live_checks(url)
+
+
+def analyze_url_with_live_checks(
+    url: str,
+    live_fetcher=None,
+) -> DetectionResult:
     features = extract_url_features(url)
-    score, factors, breakdown = _score_features(features)
+    content_analysis, redirect_analysis = _collect_live_checks(url, live_fetcher)
+    score, factors, breakdown = _score_features(
+        features, content_analysis, redirect_analysis
+    )
 
     return DetectionResult(
         risk_score=score,
@@ -27,13 +39,15 @@ def analyze_url(url: str) -> DetectionResult:
         risk_factors=tuple(factors),
         extracted_features=_serialize_features(features),
         score_breakdown=tuple(breakdown),
-        content_analysis=_build_content_analysis_placeholder(),
-        redirect_analysis=_build_redirect_analysis_placeholder(),
+        content_analysis=content_analysis,
+        redirect_analysis=redirect_analysis,
     )
 
 
 def _score_features(
     features: UrlFeatures,
+    content_analysis: dict[str, object],
+    redirect_analysis: dict[str, object],
 ) -> tuple[int, list[str], list[dict[str, object]]]:
     score = 0
     factors: list[str] = []
@@ -44,7 +58,10 @@ def _score_features(
         if triggered:
             score += points
             factors.append(reason)
+            title, impact = _rule_explanation(label)
             breakdown.append({"rule": label, "points": points, "reason": reason})
+            breakdown[-1]["title"] = title
+            breakdown[-1]["impact"] = impact
 
     add_rule(
         features.url_length >= 100,
@@ -116,11 +133,14 @@ def _score_features(
         )
         score += keyword_points
         factors.append(keyword_reason)
+        title, impact = _rule_explanation("suspicious_keywords")
         breakdown.append(
             {
                 "rule": "suspicious_keywords",
                 "points": keyword_points,
                 "reason": keyword_reason,
+                "title": title,
+                "impact": impact,
             }
         )
 
@@ -129,6 +149,48 @@ def _score_features(
         8,
         "many_query_parameters",
         "URL has many query parameters",
+    )
+
+    add_rule(
+        bool(content_analysis.get("login_form_detected")),
+        8,
+        "login_form",
+        "Page contains a login form",
+    )
+
+    add_rule(
+        bool(content_analysis.get("password_field_detected")),
+        10,
+        "password_field",
+        "Page asks for a password",
+    )
+
+    add_rule(
+        bool(content_analysis.get("urgency_language_detected")),
+        8,
+        "urgency_language",
+        "Page uses urgent or fear-based wording",
+    )
+
+    add_rule(
+        bool(content_analysis.get("external_scripts_detected")),
+        6,
+        "external_scripts",
+        "Page loads scripts from another site",
+    )
+
+    add_rule(
+        bool(redirect_analysis.get("cross_domain_redirect_detected")),
+        10,
+        "cross_domain_redirect",
+        "Link redirects to a different website",
+    )
+
+    add_rule(
+        bool(redirect_analysis.get("suspicious_redirect_chain")),
+        12,
+        "suspicious_redirect_chain",
+        "Link uses a suspicious redirect chain",
     )
 
     return min(score, 100), factors, breakdown
@@ -179,3 +241,89 @@ def _build_redirect_analysis_placeholder() -> dict[str, object]:
         "suspicious_redirect_chain": None,
         "notes": "Live redirect tracing has not been enabled yet.",
     }
+
+
+def _collect_live_checks(
+    url: str,
+    live_fetcher,
+) -> tuple[dict[str, object], dict[str, object]]:
+    if live_fetcher is None:
+        return _build_content_analysis_placeholder(), _build_redirect_analysis_placeholder()
+    return live_fetcher(url)
+
+
+def _rule_explanation(label: str) -> tuple[str, str]:
+    explanations = {
+        "long_url": (
+            "Very long link",
+            "Long links can hide the real destination and make phishing pages harder to spot.",
+        ),
+        "at_symbol": (
+            "@ symbol in the link",
+            "Attackers can use @ to make a link look familiar while sending you somewhere else.",
+        ),
+        "no_https": (
+            "No HTTPS",
+            "Any data you type into a page without HTTPS can be intercepted, including passwords.",
+        ),
+        "ip_hostname": (
+            "Raw IP address",
+            "Legitimate brands usually use readable names, not raw server addresses.",
+        ),
+        "many_subdomains": (
+            "Too many subdomains",
+            "Extra subdomains are often used to mimic trusted brands and confuse readers.",
+        ),
+        "many_hyphens": (
+            "Hyphen-heavy website name",
+            "Attackers often stuff brand-like words into long hyphenated domains because they are cheap to register.",
+        ),
+        "deep_path": (
+            "Unusually deep link path",
+            "Overly deep paths can be used to hide suspicious pages inside messy-looking links.",
+        ),
+        "encoded_characters": (
+            "Encoded characters in the link",
+            "Encoded text can disguise what a link really points to.",
+        ),
+        "high_risk_tld": (
+            "Unusual website ending",
+            "Less familiar endings like .top or .xyz are often used by attackers because they are cheap and disposable.",
+        ),
+        "suspicious_keywords": (
+            "Suspicious words in the link",
+            "Words like login, verify, or secure are commonly used to pressure people into trusting a fake page.",
+        ),
+        "many_query_parameters": (
+            "Too many query items",
+            "Messy links with lots of query items can be used to hide tracking or disguise the real destination.",
+        ),
+        "login_form": (
+            "Login form detected",
+            "A page asking you to log in may be trying to capture your credentials.",
+        ),
+        "password_field": (
+            "Password field detected",
+            "If a suspicious page asks for your password, entering it could hand your account to an attacker.",
+        ),
+        "urgency_language": (
+            "Urgent wording detected",
+            "Phishing pages often create panic so people act before they stop to verify the link.",
+        ),
+        "external_scripts": (
+            "Outside scripts detected",
+            "Loading code from other sites can be a sign of a hastily assembled or unsafe page.",
+        ),
+        "cross_domain_redirect": (
+            "Redirect to another site",
+            "A link that bounces you to a different site can hide the real destination until after you click.",
+        ),
+        "suspicious_redirect_chain": (
+            "Suspicious redirect chain",
+            "Multiple redirects are often used to hide where a link ends up and bypass simple checks.",
+        ),
+    }
+    return explanations.get(
+        label,
+        ("Risk signal detected", "This pattern is often seen in malicious or misleading links."),
+    )

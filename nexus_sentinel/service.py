@@ -1,10 +1,17 @@
+from __future__ import annotations
+
 import hashlib
 import json
+import sqlite3
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
-from nexus_sentinel.detector import analyze_url
+from nexus_sentinel.detector import DetectionResult, analyze_url_with_live_checks
+
+
+LiveFetcher = Callable[[str], tuple[dict[str, object], dict[str, object]]]
 
 
 @dataclass(frozen=True)
@@ -19,24 +26,31 @@ class AnalysisRecord:
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
     redirect_analysis: dict[str, object]
-    campaign_id: str
-    campaign_size: int
+    similar_group_id: str
+    similar_group_size: int
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
 
 
 class AnalysisService:
-    def __init__(self, storage_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        storage_path: str | Path | None = None,
+        live_fetcher: LiveFetcher | None = None,
+    ) -> None:
         self._storage_path = Path(storage_path) if storage_path else None
-        self._records = self._load_records()
+        self._live_fetcher = live_fetcher
+        database_path = str(self._storage_path) if self._storage_path else ":memory:"
+        self._connection = sqlite3.connect(database_path)
+        self._connection.row_factory = sqlite3.Row
+        self._initialize_schema()
 
     def analyze(self, url: str, save: bool = True) -> AnalysisRecord:
-        detection = analyze_url(url)
-        campaign_id = _campaign_id_for(detection.extracted_features)
-        campaign_size = (
-            sum(1 for record in self._records if record.campaign_id == campaign_id) + 1
-        )
+        detection = analyze_url_with_live_checks(url, live_fetcher=self._live_fetcher)
+        similar_group_id = _similar_group_id_for(detection.extracted_features)
+        saved_count = self._count_saved_records_for_group(similar_group_id)
+        similar_group_size = saved_count + 1
 
         record = AnalysisRecord(
             url=url,
@@ -49,22 +63,21 @@ class AnalysisService:
             score_breakdown=detection.score_breakdown,
             content_analysis=detection.content_analysis,
             redirect_analysis=detection.redirect_analysis,
-            campaign_id=campaign_id,
-            campaign_size=campaign_size,
+            similar_group_id=similar_group_id,
+            similar_group_size=similar_group_size,
         )
         if save:
-            self._records.append(record)
-            self._save_records()
+            self._insert_record(record)
         return record
 
-    def list_campaigns(self) -> list[dict[str, object]]:
+    def list_similar_groups(self) -> list[dict[str, object]]:
         grouped: dict[str, dict[str, object]] = {}
 
-        for record in self._records:
-            campaign = grouped.setdefault(
-                record.campaign_id,
+        for record in self._saved_records():
+            similar_group = grouped.setdefault(
+                record.similar_group_id,
                 {
-                    "campaign_id": record.campaign_id,
+                    "similar_group_id": record.similar_group_id,
                     "classification": record.classification,
                     "size": 0,
                     "example_urls": [],
@@ -75,89 +88,167 @@ class AnalysisService:
                     "latest_seen": record.analyzed_at,
                 },
             )
-            campaign["size"] = int(campaign["size"]) + 1
-            example_urls = campaign["example_urls"]
+            similar_group["size"] = int(similar_group["size"]) + 1
+            example_urls = similar_group["example_urls"]
             if len(example_urls) < 3:
                 example_urls.append(record.url)
-            campaign["first_seen"] = min(str(campaign["first_seen"]), record.analyzed_at)
-            campaign["latest_seen"] = max(
-                str(campaign["latest_seen"]), record.analyzed_at
+            similar_group["first_seen"] = min(
+                str(similar_group["first_seen"]), record.analyzed_at
+            )
+            similar_group["latest_seen"] = max(
+                str(similar_group["latest_seen"]), record.analyzed_at
             )
 
-        for campaign in grouped.values():
-            campaign_records = [
+        for similar_group in grouped.values():
+            group_records = [
                 record
-                for record in self._records
-                if record.campaign_id == campaign["campaign_id"]
+                for record in self._saved_records()
+                if record.similar_group_id == similar_group["similar_group_id"]
             ]
             factor_counts: dict[str, int] = {}
-            for record in campaign_records:
+            for record in group_records:
                 for factor in record.risk_factors:
                     factor_counts[factor] = factor_counts.get(factor, 0) + 1
-            campaign["common_risk_factors"] = [
+            similar_group["common_risk_factors"] = [
                 factor
                 for factor, _count in sorted(
                     factor_counts.items(),
                     key=lambda item: (-item[1], item[0]),
                 )[:2]
             ]
-            campaign["shared_traits"] = _shared_traits(campaign_records)
-            campaign["grouping_reason"] = _grouping_reason(campaign)
+            similar_group["shared_traits"] = _shared_traits(group_records)
+            similar_group["grouping_reason"] = _grouping_reason(similar_group)
 
         return sorted(
             grouped.values(),
-            key=lambda campaign: (-int(campaign["size"]), str(campaign["campaign_id"])),
+            key=lambda group: (-int(group["size"]), str(group["similar_group_id"])),
         )
 
     def overview(self) -> dict[str, int]:
-        risk_scores = [record.risk_score for record in self._records]
+        cursor = self._connection.execute(
+            """
+            SELECT COUNT(*) AS total_scans,
+                   COUNT(DISTINCT similar_group_id) AS active_similar_groups,
+                   COALESCE(MAX(risk_score), 0) AS highest_risk
+            FROM scans
+            """
+        )
+        row = cursor.fetchone()
         return {
-            "total_scans": len(self._records),
-            "active_campaigns": len(
-                {record.campaign_id for record in self._records}
-            ),
-            "highest_risk": max(risk_scores, default=0),
+            "total_scans": int(row["total_scans"] or 0),
+            "active_similar_groups": int(row["active_similar_groups"] or 0),
+            "highest_risk": int(row["highest_risk"] or 0),
         }
 
-    def recent_scans(self, limit: int = 10) -> list[dict[str, object]]:
-        return [record.to_dict() for record in reversed(self._records[-limit:])]
+    def clear_saved_history(self) -> None:
+        self._connection.execute("DELETE FROM scans")
+        self._connection.commit()
 
-    def _load_records(self) -> list[AnalysisRecord]:
-        if not self._storage_path or not self._storage_path.exists():
-            return []
-
-        payload = json.loads(self._storage_path.read_text(encoding="utf-8"))
-        return [
-            AnalysisRecord(
-                url=item["url"],
-                analyzed_at=item.get("analyzed_at", _timestamp_now()),
-                saved_to_history=bool(item.get("saved_to_history", True)),
-                risk_score=item["risk_score"],
-                classification=item["classification"],
-                risk_factors=tuple(item["risk_factors"]),
-                extracted_features=dict(item.get("extracted_features", {})),
-                score_breakdown=tuple(item.get("score_breakdown", ())),
-                content_analysis=dict(item.get("content_analysis", {})),
-                redirect_analysis=dict(item.get("redirect_analysis", {})),
-                campaign_id=item["campaign_id"],
-                campaign_size=item["campaign_size"],
+    def _initialize_schema(self) -> None:
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                url TEXT NOT NULL,
+                analyzed_at TEXT NOT NULL,
+                saved_to_history INTEGER NOT NULL,
+                risk_score INTEGER NOT NULL,
+                classification TEXT NOT NULL,
+                risk_factors_json TEXT NOT NULL,
+                extracted_features_json TEXT NOT NULL,
+                score_breakdown_json TEXT NOT NULL,
+                content_analysis_json TEXT NOT NULL,
+                redirect_analysis_json TEXT NOT NULL,
+                similar_group_id TEXT NOT NULL,
+                similar_group_size INTEGER NOT NULL
             )
-            for item in payload
-        ]
+            """
+        )
+        self._connection.commit()
 
-    def _save_records(self) -> None:
-        if not self._storage_path:
-            return
+    def _insert_record(self, record: AnalysisRecord) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO scans (
+                url,
+                analyzed_at,
+                saved_to_history,
+                risk_score,
+                classification,
+                risk_factors_json,
+                extracted_features_json,
+                score_breakdown_json,
+                content_analysis_json,
+                redirect_analysis_json,
+                similar_group_id,
+                similar_group_size
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                record.url,
+                record.analyzed_at,
+                1 if record.saved_to_history else 0,
+                record.risk_score,
+                record.classification,
+                json.dumps(record.risk_factors),
+                json.dumps(record.extracted_features),
+                json.dumps(record.score_breakdown),
+                json.dumps(record.content_analysis),
+                json.dumps(record.redirect_analysis),
+                record.similar_group_id,
+                record.similar_group_size,
+            ),
+        )
+        self._connection.commit()
 
-        self._storage_path.parent.mkdir(parents=True, exist_ok=True)
-        serialized = [record.to_dict() for record in self._records]
-        self._storage_path.write_text(
-            json.dumps(serialized, indent=2),
-            encoding="utf-8",
+    def _saved_records(self) -> list[AnalysisRecord]:
+        cursor = self._connection.execute(
+            """
+            SELECT url,
+                   analyzed_at,
+                   saved_to_history,
+                   risk_score,
+                   classification,
+                   risk_factors_json,
+                   extracted_features_json,
+                   score_breakdown_json,
+                   content_analysis_json,
+                   redirect_analysis_json,
+                   similar_group_id,
+                   similar_group_size
+            FROM scans
+            ORDER BY analyzed_at ASC
+            """
+        )
+        return [self._row_to_record(row) for row in cursor.fetchall()]
+
+    def _count_saved_records_for_group(self, similar_group_id: str) -> int:
+        cursor = self._connection.execute(
+            "SELECT COUNT(*) AS count FROM scans WHERE similar_group_id = ?",
+            (similar_group_id,),
+        )
+        row = cursor.fetchone()
+        return int(row["count"] or 0)
+
+    def _row_to_record(self, row: sqlite3.Row) -> AnalysisRecord:
+        return AnalysisRecord(
+            url=str(row["url"]),
+            analyzed_at=str(row["analyzed_at"]),
+            saved_to_history=bool(row["saved_to_history"]),
+            risk_score=int(row["risk_score"]),
+            classification=str(row["classification"]),
+            risk_factors=tuple(json.loads(row["risk_factors_json"])),
+            extracted_features=dict(json.loads(row["extracted_features_json"])),
+            score_breakdown=tuple(json.loads(row["score_breakdown_json"])),
+            content_analysis=dict(json.loads(row["content_analysis_json"])),
+            redirect_analysis=dict(json.loads(row["redirect_analysis_json"])),
+            similar_group_id=str(row["similar_group_id"]),
+            similar_group_size=int(row["similar_group_size"]),
         )
 
 
-def _campaign_id_for(features: dict[str, object]) -> str:
+def _similar_group_id_for(features: dict[str, object]) -> str:
     pattern = {
         "has_encoded_characters": features.get("has_encoded_characters"),
         "has_suspicious_tld": features.get("has_suspicious_tld"),
@@ -172,7 +263,7 @@ def _campaign_id_for(features: dict[str, object]) -> str:
         "uses_https": features.get("uses_https"),
     }
     encoded = json.dumps(pattern, sort_keys=True).encode("utf-8")
-    return "cmp_" + hashlib.sha256(encoded).hexdigest()[:12]
+    return "grp_" + hashlib.sha256(encoded).hexdigest()[:12]
 
 
 def _timestamp_now() -> str:
@@ -218,8 +309,8 @@ def _shared_traits(records: list[AnalysisRecord]) -> list[str]:
     return traits[:3]
 
 
-def _grouping_reason(campaign: dict[str, object]) -> str:
-    shared_traits = list(campaign.get("shared_traits", ()))
+def _grouping_reason(similar_group: dict[str, object]) -> str:
+    shared_traits = list(similar_group.get("shared_traits", ()))
     if shared_traits:
         return "This group matches the same suspicious link pattern and repeated signs."
     return "This group matches the same suspicious link pattern."

@@ -4,24 +4,32 @@ from pathlib import Path
 from urllib.parse import parse_qs
 from wsgiref.simple_server import make_server
 
+from nexus_sentinel.live_checks import run_live_checks
 from nexus_sentinel.service import AnalysisService
 
 
 ASSET_DIR = Path(__file__).parent / "webapp"
-DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.json"
+DEFAULT_STORAGE_PATH = Path("data") / "analysis_history.sqlite3"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 9010
 
 
 class DashboardApp:
-    def __init__(self, storage_path: str | Path | None = None) -> None:
-        self._service = AnalysisService(storage_path=storage_path)
+    def __init__(
+        self,
+        storage_path: str | Path | None = None,
+        live_fetcher=None,
+    ) -> None:
+        self._service = AnalysisService(
+            storage_path=storage_path,
+            live_fetcher=live_fetcher,
+        )
 
     def __call__(self, environ: dict, start_response) -> list[bytes]:
         path = environ.get("PATH_INFO", "/")
         method = environ.get("REQUEST_METHOD", "GET")
 
-        if method != "GET":
+        if method not in {"GET", "POST"}:
             return self._json_response(
                 start_response,
                 405,
@@ -38,14 +46,21 @@ class DashboardApp:
             return self._file_response(start_response, "styles.css", "text/css")
         if path == "/api/analyze":
             return self._handle_analyze(environ, start_response)
-        if path == "/api/campaigns":
+        if path in {"/api/campaigns", "/api/similar-groups"}:
             return self._json_response(
                 start_response,
                 200,
                 {
-                    "campaigns": self._service.list_campaigns(),
+                    "similar_groups": self._service.list_similar_groups(),
                     "overview": self._service.overview(),
                 },
+            )
+        if path == "/api/history/clear" and method == "POST":
+            self._service.clear_saved_history()
+            return self._json_response(
+                start_response,
+                200,
+                {"ok": True, "message": "Saved history cleared."},
             )
 
         return self._json_response(start_response, 404, {"error": "Not found"})
@@ -90,7 +105,7 @@ class DashboardApp:
 
 
 def main() -> None:
-    app = DashboardApp(storage_path=DEFAULT_STORAGE_PATH)
+    app = DashboardApp(storage_path=DEFAULT_STORAGE_PATH, live_fetcher=run_live_checks)
     host, port = _pick_available_address(DEFAULT_HOST, DEFAULT_PORT)
     with make_server(host, port, app) as server:
         print(f"Nexus Sentinel dashboard running on http://{host}:{port}")
