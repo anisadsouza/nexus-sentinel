@@ -405,6 +405,12 @@ button.secondary {
   gap: 12px;
 }
 
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .section-heading {
   margin-bottom: 16px;
 }
@@ -814,7 +820,7 @@ button.secondary {
 .factor-row {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 10px;
 }
 
@@ -844,9 +850,28 @@ button.secondary {
   color: var(--green-text);
 }
 
+.factor-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.factor-title {
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.factor-impact {
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--factor-text);
+}
+
 .factor-text {
   font-size: 14px;
-  font-weight: 500;
+  line-height: 1.5;
   color: var(--factor-text);
 }
 

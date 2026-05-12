@@ -46,7 +46,7 @@ class DashboardApp:
             return self._file_response(start_response, "styles.css", "text/css")
         if path == "/api/analyze":
             return self._handle_analyze(environ, start_response)
-        if path in {"/api/campaigns", "/api/similar-groups"}:
+        if path == "/api/similar-groups":
             return self._json_response(
                 start_response,
                 200,

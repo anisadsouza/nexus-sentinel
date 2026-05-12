@@ -1,6 +1,6 @@
 import unittest
 
-from nexus_sentinel.detector import analyze_url
+from nexus_sentinel.detector import analyze_url, analyze_url_with_live_checks
 
 
 class DetectorTests(unittest.TestCase):
@@ -43,6 +43,47 @@ class DetectorTests(unittest.TestCase):
         )
         self.assertIn("notes", result.content_analysis)
         self.assertIn("notes", result.redirect_analysis)
+
+    def test_live_checks_add_page_and_redirect_risk_signals(self) -> None:
+        def fake_live_fetcher(_url: str) -> tuple[dict[str, object], dict[str, object]]:
+            return (
+                {
+                    "status": "fetched",
+                    "page_title": "Verify your account now",
+                    "login_form_detected": True,
+                    "password_field_detected": True,
+                    "urgency_language_detected": True,
+                    "external_scripts_detected": True,
+                    "notes": "Fetched test page.",
+                },
+                {
+                    "status": "fetched",
+                    "redirect_count": 2,
+                    "final_url": "https://secure-check.top/login",
+                    "cross_domain_redirect_detected": True,
+                    "suspicious_redirect_chain": True,
+                    "notes": "Fetched test redirect chain.",
+                },
+            )
+
+        result = analyze_url_with_live_checks(
+            "http://secure-check.top/login",
+            live_fetcher=fake_live_fetcher,
+        )
+
+        self.assertEqual(result.content_analysis["status"], "fetched")
+        self.assertEqual(result.redirect_analysis["status"], "fetched")
+        self.assertIn("Page asks for a password", result.risk_factors)
+        self.assertIn("Link uses a suspicious redirect chain", result.risk_factors)
+        self.assertTrue(
+            any(item["rule"] == "password_field" for item in result.score_breakdown)
+        )
+        self.assertTrue(
+            any(
+                item["title"] == "No HTTPS" and "passwords" in item["impact"]
+                for item in result.score_breakdown
+            )
+        )
 
 
 if __name__ == "__main__":

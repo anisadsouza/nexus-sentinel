@@ -3,6 +3,7 @@ const urlInput = document.getElementById("url-input");
 const result = document.getElementById("result");
 const campaigns = document.getElementById("campaigns");
 const refreshButton = document.getElementById("refresh-campaigns");
+const clearHistoryButton = document.getElementById("clear-history");
 const totalScans = document.getElementById("total-scans");
 const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
@@ -86,6 +87,24 @@ clearUrlButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void loadCampaigns();
+});
+
+clearHistoryButton.addEventListener("click", async () => {
+  try {
+    const response = await fetch("/api/history/clear", { method: "POST" });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Could not clear saved history.");
+    }
+
+    formMessage.textContent = data.message || "Saved history cleared.";
+    formMessage.className = "form-message success";
+    await loadCampaigns();
+  } catch (error) {
+    formMessage.textContent = error.message;
+    formMessage.className = "form-message error";
+  }
 });
 
 async function loadCampaigns() {
@@ -334,7 +353,10 @@ function buildRiskRows(scoreBreakdown) {
     return `
       <div class="factor-row">
         <span class="factor-icon factor-good">✓</span>
-        <span class="factor-text">No major URL-level risks were triggered.</span>
+        <div class="factor-copy">
+          <p class="factor-title">No major risk signals</p>
+          <p class="factor-impact">This link did not trigger any strong warning signs in the checks that were available.</p>
+        </div>
         <span class="factor-points">0</span>
       </div>
     `;
@@ -346,7 +368,10 @@ function buildRiskRows(scoreBreakdown) {
       return `
         <div class="factor-row">
           <span class="factor-icon ${toneClass}">!</span>
-          <span class="factor-text">${item.reason}</span>
+          <div class="factor-copy">
+            <p class="factor-title">${item.title || item.reason}</p>
+            <p class="factor-impact">${item.impact || item.reason}</p>
+          </div>
           <span class="factor-points">+${item.points}</span>
         </div>
       `;
@@ -374,7 +399,10 @@ function buildGoodSignalRows(features) {
     return `
       <div class="factor-row">
         <span class="factor-icon factor-warn">!</span>
-        <span class="factor-text">No strong positive URL-level signals were detected.</span>
+        <div class="factor-copy">
+          <p class="factor-title">No strong positive signs</p>
+          <p class="factor-impact">The link did not show clear trust signals that would lower concern on their own.</p>
+        </div>
         <span class="factor-points">-</span>
       </div>
     `;
@@ -385,7 +413,9 @@ function buildGoodSignalRows(features) {
       (row) => `
         <div class="factor-row">
           <span class="factor-icon factor-good">✓</span>
-          <span class="factor-text">${row}</span>
+          <div class="factor-copy">
+            <p class="factor-title">${row}</p>
+          </div>
           <span class="factor-points factor-points-good">OK</span>
         </div>
       `
@@ -474,13 +504,28 @@ function buildTips(data, features) {
       : "This scan was kept private and was not added to shared history.",
   ];
 
+  if (data.content_analysis && data.redirect_analysis) {
+    if (data.content_analysis.status === "fetched" || data.redirect_analysis.status === "fetched") {
+      tips.push(
+        "This result includes live page and destination checks, not just the link text."
+      );
+    } else if (
+      data.content_analysis.status === "unavailable" ||
+      data.redirect_analysis.status === "unavailable"
+    ) {
+      tips.push(
+        "Some live checks were unavailable, so this result leans more heavily on the link itself."
+      );
+    }
+  }
+
   if (data.classification === "safe") {
     tips.push(
-      "Safe here means no strong URL-level warnings were found yet. Live page-content and redirect fetching are still placeholders."
+      "Safe here means no strong warning signs were found in the checks that could be completed."
     );
   } else {
     tips.push(
-      "Treat suspicious links as untrusted until content and redirect checks are fully enabled."
+      "Treat suspicious links as untrusted, especially if they ask for a password, payment details, or urgent action."
     );
   }
 
