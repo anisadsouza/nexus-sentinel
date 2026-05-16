@@ -43,35 +43,30 @@ class AnalysisService:
         self._records = self._load_records()
 
     def analyze(self, url: str, save: bool = True) -> AnalysisRecord:
-        detection = analyze_url_with_live_checks(url, live_fetcher=self._live_fetcher)
-        similar_group_id = _similar_group_id_for(detection.extracted_features)
-        similar_group_size = (
-            sum(
-                1
-                for record in self._records
-                if record.similar_group_id == similar_group_id
-            )
-            + 1
-        )
-
-        record = AnalysisRecord(
-            url=url,
-            analyzed_at=_timestamp_now(),
-            saved_to_history=save,
-            risk_score=detection.risk_score,
-            classification=detection.classification,
-            risk_factors=detection.risk_factors,
-            extracted_features=detection.extracted_features,
-            score_breakdown=detection.score_breakdown,
-            content_analysis=detection.content_analysis,
-            redirect_analysis=detection.redirect_analysis,
-            similar_group_id=similar_group_id,
-            similar_group_size=similar_group_size,
-        )
+        record = self._build_record(url, save=save, comparison_records=self._records)
         if save:
             self._records.append(record)
             self._save_records()
         return record
+
+    def analyze_batch(self, urls: list[str], save: bool = True) -> list[AnalysisRecord]:
+        working_records = list(self._records)
+        results: list[AnalysisRecord] = []
+
+        for url in urls:
+            record = self._build_record(
+                url,
+                save=save,
+                comparison_records=working_records,
+            )
+            results.append(record)
+            working_records.append(record)
+
+        if save and results:
+            self._records.extend(results)
+            self._save_records()
+
+        return results
 
     def list_similar_groups(self) -> list[dict[str, object]]:
         grouped: dict[str, dict[str, object]] = {}
@@ -172,6 +167,38 @@ class AnalysisService:
         self._storage_path.write_text(
             json.dumps(serialized, indent=2),
             encoding="utf-8",
+        )
+
+    def _build_record(
+        self,
+        url: str,
+        save: bool,
+        comparison_records: list[AnalysisRecord],
+    ) -> AnalysisRecord:
+        detection = analyze_url_with_live_checks(url, live_fetcher=self._live_fetcher)
+        similar_group_id = _similar_group_id_for(detection.extracted_features)
+        similar_group_size = (
+            sum(
+                1
+                for record in comparison_records
+                if record.similar_group_id == similar_group_id
+            )
+            + 1
+        )
+
+        return AnalysisRecord(
+            url=url,
+            analyzed_at=_timestamp_now(),
+            saved_to_history=save,
+            risk_score=detection.risk_score,
+            classification=detection.classification,
+            risk_factors=detection.risk_factors,
+            extracted_features=detection.extracted_features,
+            score_breakdown=detection.score_breakdown,
+            content_analysis=detection.content_analysis,
+            redirect_analysis=detection.redirect_analysis,
+            similar_group_id=similar_group_id,
+            similar_group_size=similar_group_size,
         )
 
 

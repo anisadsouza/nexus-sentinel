@@ -190,6 +190,43 @@ h1 {
   max-width: 1080px;
 }
 
+.batch-upload-card,
+.batch-results-panel {
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.batch-upload-copy h2,
+.batch-results-header h2 {
+  margin-bottom: 6px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.batch-upload-note {
+  margin-bottom: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.batch-upload-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.batch-upload-actions input[type="file"] {
+  max-width: 100%;
+  padding: 9px 12px;
+  font-family: inherit;
+  font-weight: 500;
+}
+
 .privacy-toggle {
   display: inline-flex;
   align-items: center;
@@ -341,6 +378,54 @@ button:disabled {
 button.secondary {
   color: var(--text);
   background: var(--surface);
+}
+
+.batch-results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.batch-table-wrap {
+  overflow-x: auto;
+}
+
+.batch-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.batch-table th,
+.batch-table td {
+  padding: 12px 10px;
+  border-top: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.batch-table th {
+  color: var(--label);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.batch-table tbody tr:hover {
+  background: color-mix(in srgb, var(--surface) 82%, var(--accent) 3%);
+}
+
+.batch-url-cell {
+  max-width: 0;
+  color: var(--accent-strong);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metric-label {
@@ -1003,7 +1088,8 @@ button.secondary {
   .explanation-grid,
   .overview-grid,
   .input-row,
-  .result-shell {
+  .result-shell,
+  .batch-results-header {
     grid-template-columns: 1fr;
   }
 
@@ -1032,6 +1118,11 @@ button.secondary {
   .result-panel {
     padding-left: 20px;
     padding-right: 20px;
+  }
+
+  .batch-upload-card,
+  .batch-results-panel {
+    padding: 18px;
   }
 
   .overview-item {

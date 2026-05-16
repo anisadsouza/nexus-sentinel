@@ -8,6 +8,10 @@ const activeCampaigns = document.getElementById("active-campaigns");
 const highestRisk = document.getElementById("highest-risk");
 const formMessage = document.getElementById("form-message");
 const analyzeButton = document.getElementById("analyze-button");
+const batchFileInput = document.getElementById("batch-file");
+const batchAnalyzeButton = document.getElementById("batch-analyze-button");
+const batchMessage = document.getElementById("batch-message");
+const batchResults = document.getElementById("batch-results");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
@@ -86,6 +90,63 @@ clearUrlButton.addEventListener("click", () => {
 
 refreshButton.addEventListener("click", () => {
   void loadCampaigns();
+});
+
+batchFileInput.addEventListener("change", () => {
+  if (!batchFileInput.files || !batchFileInput.files.length) {
+    batchMessage.textContent = "Choose a CSV file to analyze.";
+    batchMessage.className = "form-message muted";
+    return;
+  }
+
+  batchMessage.textContent = `${batchFileInput.files[0].name} ready for batch analysis.`;
+  batchMessage.className = "form-message muted";
+});
+
+batchAnalyzeButton.addEventListener("click", async () => {
+  const file = batchFileInput.files && batchFileInput.files[0];
+  if (!file) {
+    batchMessage.textContent = "Choose a CSV file with URLs first.";
+    batchMessage.className = "form-message error";
+    return;
+  }
+
+  setBatchButtonState(true);
+  batchMessage.textContent = "Batch analysis in progress.";
+  batchMessage.className = "form-message muted";
+  batchResults.innerHTML = '<p class="muted">Analyzing CSV...</p>';
+
+  try {
+    const csvText = await file.text();
+    const response = await fetch("/api/analyze-batch", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        csv_text: csvText,
+        private: privateScanToggle.checked,
+      }),
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Batch analysis failed.");
+    }
+
+    renderBatchResults(data);
+    await loadCampaigns();
+    batchMessage.textContent = data.summary.saved_to_history
+      ? `Batch complete. ${data.summary.total_urls} links analyzed and saved.`
+      : `Batch complete. ${data.summary.total_urls} links analyzed privately.`;
+    batchMessage.className = "form-message success";
+  } catch (error) {
+    batchMessage.textContent = error.message;
+    batchMessage.className = "form-message error";
+    batchResults.innerHTML = `<p class="error">${error.message}</p>`;
+  } finally {
+    setBatchButtonState(false);
+  }
 });
 
 async function loadCampaigns() {
@@ -248,10 +309,68 @@ function setAnalyzeButtonState(isLoading) {
   analyzeButton.textContent = isLoading ? "Analyzing..." : "Analyze";
 }
 
+function setBatchButtonState(isLoading) {
+  batchAnalyzeButton.disabled = isLoading;
+  batchAnalyzeButton.textContent = isLoading ? "Analyzing CSV..." : "Analyze CSV";
+}
+
 function renderOverview(overview) {
   totalScans.textContent = String(overview.total_scans || 0);
   activeCampaigns.textContent = String(overview.active_similar_groups || 0);
   highestRisk.textContent = String(overview.highest_risk || 0);
+}
+
+function renderBatchResults(data) {
+  const summary = data.summary || {};
+  const results = Array.isArray(data.results) ? data.results : [];
+
+  if (!results.length) {
+    batchResults.innerHTML = '<p class="muted">No URLs were analyzed from this file.</p>';
+    return;
+  }
+
+  batchResults.innerHTML = `
+    <div class="batch-results-header">
+      <div>
+        <p class="section-kicker">Batch Results</p>
+        <h2>CSV analysis results</h2>
+      </div>
+      <div class="meta-strip">
+        <span class="meta-pill">${summary.total_urls || results.length} scanned</span>
+        <span class="meta-pill">${summary.phishing || 0} phishing</span>
+        <span class="meta-pill">${summary.suspicious || 0} suspicious</span>
+        <span class="meta-pill">${summary.saved_to_history ? "Saved batch" : "Private batch"}</span>
+      </div>
+    </div>
+    <div class="batch-table-wrap">
+      <table class="batch-table">
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Result</th>
+            <th>Score</th>
+            <th>Similar Links</th>
+            <th>Storage</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results
+            .map(
+              (item) => `
+                <tr>
+                  <td class="batch-url-cell" title="${item.url}">${item.url}</td>
+                  <td><span class="risk-pill ${statusClass(item.classification)}">${sentenceCase(item.classification)}</span></td>
+                  <td>${item.risk_score}</td>
+                  <td>${item.similar_group_size}</td>
+                  <td>${item.saved_to_history ? "Saved" : "Private"}</td>
+                </tr>
+              `
+            )
+            .join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function statusClass(classification) {

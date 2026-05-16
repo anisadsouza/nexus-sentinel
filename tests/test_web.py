@@ -1,4 +1,5 @@
 import json
+from io import BytesIO
 from tempfile import TemporaryDirectory
 import unittest
 from wsgiref.util import setup_testing_defaults
@@ -99,6 +100,44 @@ class DashboardAppTests(unittest.TestCase):
         campaign_payload = json.loads(campaign_body)
         self.assertEqual(campaign_payload["overview"]["total_scans"], 0)
 
+    def test_batch_analyze_endpoint_returns_table_data(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+
+            status, headers, body = _run_app(
+                app,
+                path="/api/analyze-batch",
+                method="POST",
+                body=json.dumps(
+                    {
+                        "csv_text": "url\nhttps://example.com\nhttp://192.168.1.5/login\n",
+                        "private": True,
+                    }
+                ),
+            )
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertEqual(payload["summary"]["total_urls"], 2)
+        self.assertEqual(len(payload["results"]), 2)
+        self.assertFalse(payload["summary"]["saved_to_history"])
+
+    def test_batch_analyze_endpoint_rejects_csv_without_valid_urls(self) -> None:
+        app = DashboardApp()
+
+        status, headers, body = _run_app(
+            app,
+            path="/api/analyze-batch",
+            method="POST",
+            body=json.dumps({"csv_text": "name\nhello\nworld\n", "private": True}),
+        )
+
+        self.assertEqual(status, "400 Bad Request")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertIn("No valid URLs", payload["error"])
+
     def test_clear_history_endpoint_is_not_available(self) -> None:
         app = DashboardApp()
 
@@ -113,13 +152,20 @@ class DashboardAppTests(unittest.TestCase):
 
 
 def _run_app(
-    app: DashboardApp, path: str, query_string: str = "", method: str = "GET"
+    app: DashboardApp,
+    path: str,
+    query_string: str = "",
+    method: str = "GET",
+    body: str = "",
 ) -> tuple[str, dict[str, str], str]:
     environ: dict[str, object] = {}
     setup_testing_defaults(environ)
     environ["PATH_INFO"] = path
     environ["QUERY_STRING"] = query_string
     environ["REQUEST_METHOD"] = method
+    encoded_body = body.encode("utf-8")
+    environ["wsgi.input"] = BytesIO(encoded_body)
+    environ["CONTENT_LENGTH"] = str(len(encoded_body))
 
     result: dict[str, object] = {}
 

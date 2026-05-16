@@ -51,6 +51,23 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertEqual(service.overview()["total_scans"], 0)
         self.assertEqual(service.list_similar_groups(), [])
 
+    def test_batch_analysis_returns_results_for_each_url(self) -> None:
+        service = AnalysisService()
+
+        results = service.analyze_batch(
+            [
+                "https://example.com",
+                "http://192.168.1.5/login",
+                "https://pay-update-secure-login.top/a/b/c/d/%2Freset?next=home",
+            ],
+            save=False,
+        )
+
+        self.assertEqual(len(results), 3)
+        self.assertTrue(all(result.saved_to_history is False for result in results))
+        self.assertEqual(service.overview()["total_scans"], 0)
+        self.assertEqual(results[0].url, "https://example.com")
+
     def test_records_persist_when_storage_path_is_used(self) -> None:
         with TemporaryDirectory() as tmp_dir:
             storage_path = Path(tmp_dir) / "history.json"

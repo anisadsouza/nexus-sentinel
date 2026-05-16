@@ -65,6 +65,27 @@
           </div>
         </form>
 
+        <section class="batch-upload-card">
+          <div class="batch-upload-copy">
+            <p class="section-kicker">Batch Upload</p>
+            <h2>Analyze a CSV of links at once</h2>
+            <p class="batch-upload-note">
+              Upload up to 100 URLs from email logs or a review list, and Nexus Sentinel will check them in one pass.
+            </p>
+          </div>
+          <div class="batch-upload-actions">
+            <input id="batch-file" type="file" accept=".csv,text/csv">
+            <button id="batch-analyze-button" type="button" class="secondary">
+              Analyze CSV
+            </button>
+          </div>
+          <p id="batch-message" class="form-message muted"></p>
+        </section>
+
+        <section id="batch-results" class="batch-results-panel" aria-live="polite">
+          <p class="muted">No batch upload yet.</p>
+        </section>
+
         <section id="overview" class="overview-grid" aria-live="polite">
           <article class="overview-item">
             <p class="metric-label">Total Scans</p>
