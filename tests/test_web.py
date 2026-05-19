@@ -22,6 +22,7 @@ class DashboardAppTests(unittest.TestCase):
         self.assertEqual(headers["Content-Type"], "application/json")
         payload = json.loads(body)
         self.assertEqual(payload["url"], "https://example.com/login")
+        self.assertFalse(payload["saved_to_history"])
         self.assertIn("risk_score", payload)
         self.assertIn("similar_group_id", payload)
         self.assertIn("extracted_features", payload)
@@ -62,6 +63,7 @@ class DashboardAppTests(unittest.TestCase):
                 query_string=(
                     "url=http%3A%2F%2Fsecure-login.example.com.verify-account.test"
                     "%2Freset%3Fuser%3D1%26a%3D2%26b%3D3%26c%3D4%26d%3D5"
+                    "&private=0"
                 ),
             )
 

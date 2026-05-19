@@ -65,7 +65,7 @@ class DashboardApp:
     def _handle_analyze(self, environ: dict, start_response) -> list[bytes]:
         query = parse_qs(environ.get("QUERY_STRING", ""))
         raw_url = (query.get("url") or [""])[0].strip()
-        private_scan = (query.get("private") or ["0"])[0].strip().lower() in {
+        private_scan = (query.get("private") or ["1"])[0].strip().lower() in {
             "1",
             "true",
             "yes",
