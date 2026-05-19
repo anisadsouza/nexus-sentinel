@@ -3,7 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import math
+from pathlib import Path
 import random
+
+from nexus_sentinel.url_features import extract_url_features
 
 
 _FEATURE_SPECS = (
@@ -156,6 +159,13 @@ _TRAINING_WEIGHTS = (
     0.95,
 )
 
+_DATASET_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "training"
+    / "esdaung_phishdataset_balanced_20000.xlsx"
+)
+
 
 @dataclass(frozen=True)
 class _NaiveBayesModel:
@@ -231,7 +241,7 @@ def _build_real_ml_analysis(
     if bundle is None:
         return None
 
-    model = bundle
+    model, dataset_metadata = bundle
     vector_array = np.asarray(vector, dtype=float)
     probability = float(model.predict_proba(vector_array.reshape(1, -1))[0][1])
     predicted_classification = _classify_probability(probability)
@@ -246,7 +256,9 @@ def _build_real_ml_analysis(
         "shap_status": "available",
         "feature_vector": feature_vector,
         "top_signals": top_signals,
-        "notes": "A local Random Forest model is active and this result uses true SHAP feature contributions.",
+        "training_source": dataset_metadata["source"],
+        "training_samples": dataset_metadata["samples"],
+        "notes": "A local Random Forest model is active and this result uses true SHAP feature contributions from a real labeled phishing URL dataset.",
     }
 
 
@@ -267,7 +279,9 @@ def _build_fallback_ml_analysis(
         "shap_status": "unavailable",
         "feature_vector": feature_vector,
         "top_signals": _build_proxy_explanation(model, vector),
-        "notes": "A lightweight local model is active. SHAP is not available in this interpreter, so the explanation below uses a simpler feature-gap proxy.",
+        "training_source": "synthetic fallback",
+        "training_samples": 850,
+        "notes": "A lightweight local model is active. SHAP or the real dataset-backed stack is not available in this interpreter, so the explanation below uses a simpler feature-gap proxy.",
     }
 
 
@@ -286,26 +300,73 @@ def _feature_vector(
 def _get_real_model_bundle():
     try:
         import numpy as np
+        import pandas as pd
         from sklearn.ensemble import RandomForestClassifier
     except Exception:
         return None
 
-    rng = np.random.default_rng(42)
-    training_rows = 850
-    training_vectors = rng.random((training_rows, len(_FEATURE_SPECS)))
-    raw_scores = training_vectors @ np.asarray(_TRAINING_WEIGHTS, dtype=float)
-    raw_scores += 0.55 * (training_vectors[:, 1] * training_vectors[:, 11])
-    raw_scores += 0.45 * (training_vectors[:, 7] * training_vectors[:, 8])
-    raw_scores += 0.35 * (training_vectors[:, 14] * training_vectors[:, 15])
-    labels = (raw_scores >= 4.65).astype(int)
+    if not _DATASET_PATH.exists():
+        return None
+
+    frame = pd.read_excel(_DATASET_PATH)
+    if "URLs" not in frame.columns or "Labels" not in frame.columns:
+        return None
+
+    training_vectors: list[tuple[float, ...]] = []
+    labels: list[int] = []
+
+    for row in frame.itertuples(index=False):
+        url = str(getattr(row, "URLs", "") or "").strip()
+        label = int(getattr(row, "Labels", 0))
+        if not url:
+            continue
+
+        features = extract_url_features(url)
+        serialized = {
+            "url_length": features.url_length,
+            "uses_https": features.uses_https,
+            "hostname": features.hostname,
+            "is_ip_hostname": features.is_ip_hostname,
+            "subdomain_count": features.subdomain_count,
+            "hostname_hyphen_count": features.hostname_hyphen_count,
+            "path_depth": features.path_depth,
+            "has_encoded_characters": features.has_encoded_characters,
+            "has_suspicious_tld": features.has_suspicious_tld,
+            "suspicious_keywords": list(features.suspicious_keywords),
+            "query_parameter_count": features.query_parameter_count,
+        }
+        vector = _feature_vector(
+            serialized,
+            {
+                "login_form_detected": False,
+                "password_field_detected": False,
+                "urgency_language_detected": False,
+                "external_scripts_detected": False,
+            },
+            {
+                "cross_domain_redirect_detected": False,
+                "suspicious_redirect_chain": False,
+            },
+        )
+        training_vectors.append(vector)
+        labels.append(label)
+
+    if not training_vectors:
+        return None
+
+    training_array = np.asarray(training_vectors, dtype=float)
+    labels_array = np.asarray(labels, dtype=int)
 
     model = RandomForestClassifier(
         n_estimators=120,
         max_depth=6,
         random_state=42,
     )
-    model.fit(training_vectors, labels)
-    return model
+    model.fit(training_array, labels_array)
+    return model, {
+        "source": "ESDAUNG PhishDataset balanced set",
+        "samples": int(labels_array.shape[0]),
+    }
 
 
 @lru_cache(maxsize=1)
