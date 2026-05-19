@@ -30,6 +30,7 @@ The result includes:
 - plain-language explanations of why the link was flagged
 - page check details
 - destination check details
+- a lightweight model check with explanation signals
 
 ### 2. Batch URL Upload
 
@@ -125,5 +126,18 @@ This is still a local development app, not a multi-user system with accounts. If
 - redirect checks
 - batch CSV analysis
 - plain-language risk explanations
+- tooltip-based "Why this matters" explanations
+- lightweight local ML model output
+- SHAP readiness/status reporting in the UI
 - theme toggle
 - test coverage for core flows
+
+## What Is Not Finished Yet
+
+- full trained production ML model from real phishing datasets
+- true SHAP values in this local environment
+- LIME explainability
+- real database storage
+- authentication
+- public deployment
+- full analyst reporting and exports

@@ -17,6 +17,8 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.redirect_analysis["status"], "not_fetched")
         self.assertEqual(result.ml_analysis["status"], "available")
         self.assertIn("prediction_probability", result.ml_analysis)
+        self.assertIn("shap_status", result.ml_analysis)
+        self.assertIn("feature_vector", result.ml_analysis)
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(

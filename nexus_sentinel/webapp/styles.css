@@ -646,6 +646,13 @@ button:disabled {
   align-items: center;
 }
 
+.ml-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .content-status-row {
   margin-bottom: 14px;
 }
@@ -664,6 +671,18 @@ button:disabled {
 .meta-pill {
   border: 1px solid var(--border);
   color: var(--muted);
+}
+
+.ml-pill-ready {
+  background: var(--green-soft);
+  color: var(--green-text);
+  border-color: transparent;
+}
+
+.ml-pill-pending {
+  background: var(--amber-soft);
+  color: var(--amber-text);
+  border-color: transparent;
 }
 
 .status-safe {

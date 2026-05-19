@@ -68,6 +68,7 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertEqual(service.overview()["total_scans"], 0)
         self.assertEqual(results[0].url, "https://example.com")
         self.assertTrue(all("status" in result.ml_analysis for result in results))
+        self.assertTrue(all("feature_vector" in result.ml_analysis for result in results))
 
     def test_records_persist_when_storage_path_is_used(self) -> None:
         with TemporaryDirectory() as tmp_dir:

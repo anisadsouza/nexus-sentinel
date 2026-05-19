@@ -184,8 +184,25 @@ def build_ml_analysis(
         "predicted_classification": predicted_classification,
         "explanation_method": "feature_gap_proxy",
         "shap_status": _shap_status(),
+        "feature_vector": build_feature_vector_row(
+            extracted_features,
+            content_analysis,
+            redirect_analysis,
+        ),
         "top_signals": _build_proxy_explanation(model, vector),
         "notes": _model_notes(),
+    }
+
+
+def build_feature_vector_row(
+    extracted_features: dict[str, object],
+    content_analysis: dict[str, object],
+    redirect_analysis: dict[str, object],
+) -> dict[str, float]:
+    vector = _feature_vector(extracted_features, content_analysis, redirect_analysis)
+    return {
+        name: round(value, 4)
+        for (name, _label, _description, _transform), value in zip(_FEATURE_SPECS, vector)
     }
 
 

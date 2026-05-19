@@ -437,9 +437,28 @@ function buildMlSummary(mlAnalysis) {
       </span>
       <p class="ml-probability">${mlAnalysis.prediction_probability}% model risk</p>
     </div>
+    <div class="ml-meta-row">
+      <span class="meta-pill">Method: ${humanizeMethod(mlAnalysis.explanation_method)}</span>
+      <span class="meta-pill ${mlAnalysis.shap_status === "available" ? "ml-pill-ready" : "ml-pill-pending"}">
+        SHAP: ${sentenceCase(mlAnalysis.shap_status || "unavailable")}
+      </span>
+    </div>
     <p class="factor-impact">${mlAnalysis.notes || ""}</p>
     <div class="factor-list">${signalMarkup}</div>
   `;
+}
+
+function humanizeMethod(method) {
+  if (method === "feature_gap_proxy") {
+    return "Feature-gap proxy";
+  }
+  if (method === "fallback_proxy") {
+    return "Fallback proxy";
+  }
+  if (method === "shap") {
+    return "SHAP";
+  }
+  return sentenceCase(method || "Unknown");
 }
 
 function buildGoodSignalRows(features) {
