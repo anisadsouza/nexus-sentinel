@@ -137,6 +137,25 @@ _FEATURE_SPECS = (
     ),
 )
 
+_TRAINING_WEIGHTS = (
+    0.55,
+    1.25,
+    1.2,
+    0.7,
+    0.55,
+    0.45,
+    0.45,
+    0.8,
+    0.95,
+    0.5,
+    0.6,
+    1.15,
+    0.75,
+    0.35,
+    0.85,
+    0.95,
+)
+
 
 @dataclass(frozen=True)
 class _NaiveBayesModel:
@@ -173,25 +192,17 @@ def build_ml_analysis(
     redirect_analysis: dict[str, object],
 ) -> dict[str, object]:
     vector = _feature_vector(extracted_features, content_analysis, redirect_analysis)
-    model = _get_model()
-    probability = model.predict_probability(vector)
-    predicted_classification = _classify_probability(probability)
+    feature_vector = build_feature_vector_row(
+        extracted_features,
+        content_analysis,
+        redirect_analysis,
+    )
 
-    return {
-        "status": "available",
-        "model_name": "SyntheticGaussianNaiveBayes",
-        "prediction_probability": round(probability * 100, 1),
-        "predicted_classification": predicted_classification,
-        "explanation_method": "feature_gap_proxy",
-        "shap_status": _shap_status(),
-        "feature_vector": build_feature_vector_row(
-            extracted_features,
-            content_analysis,
-            redirect_analysis,
-        ),
-        "top_signals": _build_proxy_explanation(model, vector),
-        "notes": _model_notes(),
-    }
+    real_ml_result = _build_real_ml_analysis(vector, feature_vector)
+    if real_ml_result is not None:
+        return real_ml_result
+
+    return _build_fallback_ml_analysis(vector, feature_vector)
 
 
 def build_feature_vector_row(
@@ -203,6 +214,60 @@ def build_feature_vector_row(
     return {
         name: round(value, 4)
         for (name, _label, _description, _transform), value in zip(_FEATURE_SPECS, vector)
+    }
+
+
+def _build_real_ml_analysis(
+    vector: tuple[float, ...],
+    feature_vector: dict[str, float],
+) -> dict[str, object] | None:
+    try:
+        import numpy as np
+        import shap
+    except Exception:
+        return None
+
+    bundle = _get_real_model_bundle()
+    if bundle is None:
+        return None
+
+    model = bundle
+    vector_array = np.asarray(vector, dtype=float)
+    probability = float(model.predict_proba(vector_array.reshape(1, -1))[0][1])
+    predicted_classification = _classify_probability(probability)
+    top_signals = _build_shap_explanation(model, vector_array)
+
+    return {
+        "status": "available",
+        "model_name": "RandomForestClassifier",
+        "prediction_probability": round(probability * 100, 1),
+        "predicted_classification": predicted_classification,
+        "explanation_method": "shap",
+        "shap_status": "available",
+        "feature_vector": feature_vector,
+        "top_signals": top_signals,
+        "notes": "A local Random Forest model is active and this result uses true SHAP feature contributions.",
+    }
+
+
+def _build_fallback_ml_analysis(
+    vector: tuple[float, ...],
+    feature_vector: dict[str, float],
+) -> dict[str, object]:
+    model = _get_fallback_model()
+    probability = model.predict_probability(vector)
+    predicted_classification = _classify_probability(probability)
+
+    return {
+        "status": "available",
+        "model_name": "SyntheticGaussianNaiveBayes",
+        "prediction_probability": round(probability * 100, 1),
+        "predicted_classification": predicted_classification,
+        "explanation_method": "feature_gap_proxy",
+        "shap_status": "unavailable",
+        "feature_vector": feature_vector,
+        "top_signals": _build_proxy_explanation(model, vector),
+        "notes": "A lightweight local model is active. SHAP is not available in this interpreter, so the explanation below uses a simpler feature-gap proxy.",
     }
 
 
@@ -218,32 +283,40 @@ def _feature_vector(
 
 
 @lru_cache(maxsize=1)
-def _get_model() -> _NaiveBayesModel:
+def _get_real_model_bundle():
+    try:
+        import numpy as np
+        from sklearn.ensemble import RandomForestClassifier
+    except Exception:
+        return None
+
+    rng = np.random.default_rng(42)
+    training_rows = 850
+    training_vectors = rng.random((training_rows, len(_FEATURE_SPECS)))
+    raw_scores = training_vectors @ np.asarray(_TRAINING_WEIGHTS, dtype=float)
+    raw_scores += 0.55 * (training_vectors[:, 1] * training_vectors[:, 11])
+    raw_scores += 0.45 * (training_vectors[:, 7] * training_vectors[:, 8])
+    raw_scores += 0.35 * (training_vectors[:, 14] * training_vectors[:, 15])
+    labels = (raw_scores >= 4.65).astype(int)
+
+    model = RandomForestClassifier(
+        n_estimators=120,
+        max_depth=6,
+        random_state=42,
+    )
+    model.fit(training_vectors, labels)
+    return model
+
+
+@lru_cache(maxsize=1)
+def _get_fallback_model() -> _NaiveBayesModel:
     rng = random.Random(42)
     safe_rows: list[tuple[float, ...]] = []
     risky_rows: list[tuple[float, ...]] = []
-    weights = (
-        0.55,
-        1.25,
-        1.2,
-        0.7,
-        0.55,
-        0.45,
-        0.45,
-        0.8,
-        0.95,
-        0.5,
-        0.6,
-        1.15,
-        0.75,
-        0.35,
-        0.85,
-        0.95,
-    )
 
     for _index in range(850):
         row = tuple(rng.random() for _unused in _FEATURE_SPECS)
-        score = sum(value * weight for value, weight in zip(row, weights))
+        score = sum(value * weight for value, weight in zip(row, _TRAINING_WEIGHTS))
         score += 0.55 * row[1] * row[11]
         score += 0.45 * row[7] * row[8]
         score += 0.35 * row[14] * row[15]
@@ -263,7 +336,9 @@ def _get_model() -> _NaiveBayesModel:
     )
 
 
-def _column_stats(rows: list[tuple[float, ...]]) -> tuple[tuple[float, ...], tuple[float, ...]]:
+def _column_stats(
+    rows: list[tuple[float, ...]],
+) -> tuple[tuple[float, ...], tuple[float, ...]]:
     means: list[float] = []
     variances: list[float] = []
 
@@ -313,23 +388,57 @@ def _build_proxy_explanation(
     return [signal for _score, signal in scored_signals[:4]]
 
 
+def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
+    import numpy as np
+    import shap
+
+    explainer = shap.TreeExplainer(model)
+    shap_values = explainer.shap_values(vector_array.reshape(1, -1))
+    contributions = _extract_positive_class_shap_values(shap_values)
+
+    ranked = sorted(
+        enumerate(contributions),
+        key=lambda item: abs(item[1]),
+        reverse=True,
+    )
+    signals: list[dict[str, object]] = []
+
+    for index, contribution in ranked[:4]:
+        if float(vector_array[index]) <= 0:
+            continue
+
+        name, label, description, _transform = _FEATURE_SPECS[index]
+        signals.append(
+            {
+                "feature": name,
+                "label": label,
+                "description": description,
+                "direction": "raises risk" if contribution >= 0 else "lowers risk",
+                "strength": round(abs(float(contribution)), 4),
+            }
+        )
+
+    return signals
+
+
+def _extract_positive_class_shap_values(shap_values) -> list[float]:
+    try:
+        import numpy as np
+    except Exception:
+        return []
+
+    if isinstance(shap_values, list):
+        return np.asarray(shap_values[-1][0], dtype=float).tolist()
+
+    values = np.asarray(shap_values, dtype=float)
+    if values.ndim == 3:
+        return values[0, :, -1].tolist()
+    return values[0].tolist()
+
+
 def _classify_probability(probability: float) -> str:
     if probability >= 0.7:
         return "phishing"
     if probability >= 0.35:
         return "suspicious"
     return "safe"
-
-
-def _shap_status() -> str:
-    try:
-        import shap  # noqa: F401
-    except Exception:
-        return "unavailable"
-    return "available"
-
-
-def _model_notes() -> str:
-    if _shap_status() == "available":
-        return "A lightweight local model is active. SHAP is available in this environment for future deeper explanation work."
-    return "A lightweight local model is active. SHAP is not available in this environment yet, so the explanation below uses a simpler feature-gap proxy."

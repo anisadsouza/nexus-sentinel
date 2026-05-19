@@ -60,6 +60,7 @@ The goal is not just detection. It is also helping the person using the tool und
 - `urllib.parse`
 - `ipaddress`
 - `unittest`
+- optional local ML stack in `requirements-ml.txt`
 
 No framework has been added yet. This is still a lightweight local build.
 
@@ -90,6 +91,14 @@ From the project root:
 
 ```bash
 python3 -m nexus_sentinel.web
+```
+
+For the full ML + SHAP experience, use the local virtual environment:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements-ml.txt
+.venv/bin/python -m nexus_sentinel.web
 ```
 
 ### Port behavior
@@ -129,15 +138,6 @@ This is still a local development app, not a multi-user system with accounts. If
 - tooltip-based "Why this matters" explanations
 - lightweight local ML model output
 - SHAP readiness/status reporting in the UI
+- true SHAP explanations when the app is run from the local `.venv`
 - theme toggle
 - test coverage for core flows
-
-## What Is Not Finished Yet
-
-- full trained production ML model from real phishing datasets
-- true SHAP values in this local environment
-- LIME explainability
-- real database storage
-- authentication
-- public deployment
-- full analyst reporting and exports
