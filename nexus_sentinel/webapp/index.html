@@ -26,12 +26,34 @@
     </header>
 
     <main class="layout">
-      <section class="intro">
-        <p class="eyebrow">Nexus Sentinel</p>
-        <h1>Analyze one URL. See the pattern behind it.</h1>
+      <section class="hero">
+        <p class="eyebrow">Private local phishing analysis</p>
+        <h1>Check one link, a whole CSV, or a few safe examples.</h1>
         <p class="lede">
-          Scan a link, understand the risk, and spot similar suspicious links.
+          Nexus Sentinel keeps the experience simple: analyze a URL, review the risk just below it, or switch to batch mode when you have a list.
         </p>
+      </section>
+
+      <nav class="workspace-tabs" aria-label="Dashboard sections">
+        <button type="button" class="workspace-tab is-active" data-panel-target="url-panel">
+          This URL
+        </button>
+        <button type="button" class="workspace-tab" data-panel-target="batch-panel">
+          Batch CSV
+        </button>
+        <button type="button" class="workspace-tab" data-panel-target="tips-panel">
+          Tips and Suggestions
+        </button>
+      </nav>
+
+      <section id="url-panel" class="workspace-panel is-active">
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Single URL</p>
+            <h2>Analyze a single link</h2>
+          </div>
+        </div>
+
         <form id="analyze-form" class="analyze-form">
           <div class="input-row">
             <input
@@ -44,35 +66,43 @@
             >
             <button id="analyze-button" type="submit">Analyze</button>
           </div>
-          <label class="privacy-toggle">
-            <input id="private-scan" type="checkbox" checked>
-            <span>Keep this scan private</span>
-          </label>
           <p id="form-message" class="form-message muted"></p>
-          <div class="sample-row" aria-label="Sample URLs">
+          <div class="sample-row" aria-label="Example URLs">
             <button type="button" class="sample-button" data-sample-url="https://example.com">
-              Safe sample
+              Safe example
             </button>
             <button type="button" class="sample-button" data-sample-url="http://192.168.1.5/login">
-              IP-host sample
+              IP-host example
             </button>
             <button type="button" class="sample-button" data-sample-url="https://pay-update-secure-login.top/a/b/c/d/%2Freset?next=home">
-              High-risk sample
+              High-risk example
             </button>
             <button type="button" id="clear-url" class="sample-button sample-button-clear">
               Clear
             </button>
           </div>
+          <p class="helper-copy">
+            Scans from this dashboard stay private by default.
+          </p>
         </form>
 
-        <section class="batch-upload-card">
-          <div class="batch-upload-copy">
+        <section id="result" class="result-panel" aria-live="polite">
+          <p class="muted">No scan yet.</p>
+        </section>
+      </section>
+
+      <section id="batch-panel" class="workspace-panel" hidden>
+        <div class="panel-head">
+          <div>
             <p class="section-kicker">Batch Upload</p>
-            <h2>Analyze a CSV of links at once</h2>
-            <p class="batch-upload-note">
-              Upload up to 100 URLs from email logs or a review list, and Nexus Sentinel will check them in one pass.
+            <h2>Analyze a CSV of URLs</h2>
+            <p class="panel-copy">
+              Upload up to 100 links from logs, reports, or email exports.
             </p>
           </div>
+        </div>
+
+        <section class="batch-upload-card">
           <div class="batch-upload-actions">
             <input id="batch-file" type="file" accept=".csv,text/csv">
             <button id="batch-analyze-button" type="button" class="secondary">
@@ -85,78 +115,61 @@
         <section id="batch-results" class="batch-results-panel" aria-live="polite">
           <p class="muted">No batch upload yet.</p>
         </section>
-
-        <section id="overview" class="overview-grid" aria-live="polite">
-          <article class="overview-item">
-            <p class="metric-label">Total Scans</p>
-            <p id="total-scans" class="metric-value">0</p>
-          </article>
-          <article class="overview-item">
-            <p class="metric-label">Similar Threat Groups</p>
-            <p id="active-campaigns" class="metric-value">0</p>
-          </article>
-          <article class="overview-item">
-            <p class="metric-label">Highest Risk</p>
-            <p id="highest-risk" class="metric-value">0</p>
-          </article>
-        </section>
-
-        <section id="result" class="result-panel" aria-live="polite">
-          <p class="muted">No scan yet.</p>
-        </section>
       </section>
 
-      <section class="dashboard-grid">
-        <section class="campaigns-section">
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Similar Threats</p>
-              <h2>Similar Threats</h2>
-            </div>
-            <div class="section-actions">
-              <button id="refresh-campaigns" type="button" class="secondary">
-                Refresh
-              </button>
-            </div>
+      <section id="tips-panel" class="workspace-panel" hidden>
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">Tips and Suggestions</p>
+            <h2>What to look for before trusting a link</h2>
           </div>
-          <div id="campaigns" class="campaigns-list">
-            <p class="muted">No similar threat matches yet.</p>
-          </div>
-        </section>
+        </div>
 
-        <section class="tips-section">
-          <div class="section-heading">
-            <div>
-              <p class="section-kicker">Security Tips</p>
-              <h2>Security Tips</h2>
-            </div>
-          </div>
+        <div class="tips-layout">
           <article class="tips-card">
             <div class="tips-list">
               <div class="tip-row">
                 <span class="tip-icon">!</span>
                 <div>
                   <p class="tip-title">Check the full domain</p>
-                  <p class="tip-copy">Look past the brand words and read the actual hostname before you trust a login page.</p>
+                  <p class="tip-copy">Brand words in the path or subdomain can be misleading. The real hostname matters most.</p>
                 </div>
               </div>
               <div class="tip-row">
                 <span class="tip-icon">i</span>
                 <div>
                   <p class="tip-title">Urgency is a common lure</p>
-                  <p class="tip-copy">Messages that push immediate action, password resets, or payment updates deserve extra scrutiny.</p>
+                  <p class="tip-copy">Reset now, verify now, payment failed, and account locked are common pressure tactics.</p>
                 </div>
               </div>
               <div class="tip-row">
                 <span class="tip-icon">✓</span>
                 <div>
-                  <p class="tip-title">Use separate verification</p>
-                  <p class="tip-copy">If a link feels off, open the official site manually or confirm through another trusted channel.</p>
+                  <p class="tip-title">Verify separately</p>
+                  <p class="tip-copy">If a link feels off, visit the official site directly instead of trusting the message.</p>
                 </div>
               </div>
             </div>
           </article>
-        </section>
+
+          <article class="examples-card">
+            <p class="section-kicker">Examples</p>
+            <div class="example-list">
+              <div class="example-item">
+                <p class="example-url">https://example.com</p>
+                <p class="example-copy">A normal HTTPS example for a low-risk check.</p>
+              </div>
+              <div class="example-item">
+                <p class="example-url">http://192.168.1.5/login</p>
+                <p class="example-copy">An IP-based hostname that helps demonstrate why raw numeric hosts can look suspicious.</p>
+              </div>
+              <div class="example-item">
+                <p class="example-url">https://pay-update-secure-login.top/a/b/c/d/%2Freset?next=home</p>
+                <p class="example-copy">A higher-risk example with unusual wording, path depth, and a risky ending.</p>
+              </div>
+            </div>
+          </article>
+        </div>
       </section>
     </main>
 
