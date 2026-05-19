@@ -123,12 +123,13 @@ This is still a development-stage product, not yet a deployed multi-user system 
 - lightweight local ML model output
 - SHAP readiness/status reporting in the UI
 - true SHAP explanations when the app is run from the local `.venv`
+- real dataset-backed model training through the bundled phishing URL dataset
 - theme toggle
 - test coverage for core flows
 
 ## What Is Still Ahead
 
-- training the ML model on real phishing and benign datasets
+- improving model quality with broader and more modern phishing/benign datasets
 - strengthening deployment and hosting
 - adding authentication and user isolation
 - moving to production-grade storage

@@ -27,3 +27,4 @@ data/*.json
 
 # macOS
 .DS_Store
+data/training/esdaung_phishdataset_balanced_20000.xlsx
