@@ -87,7 +87,10 @@ class DetectorTests(unittest.TestCase):
                 for item in result.score_breakdown
             )
         )
-        self.assertIn(result.ml_analysis["explanation_method"], {"shap", "fallback_proxy"})
+        self.assertIn(
+            result.ml_analysis["explanation_method"],
+            {"shap", "fallback_proxy", "feature_gap_proxy"},
+        )
 
 
 if __name__ == "__main__":

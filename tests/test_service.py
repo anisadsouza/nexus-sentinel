@@ -67,6 +67,7 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertTrue(all(result.saved_to_history is False for result in results))
         self.assertEqual(service.overview()["total_scans"], 0)
         self.assertEqual(results[0].url, "https://example.com")
+        self.assertTrue(all("status" in result.ml_analysis for result in results))
 
     def test_records_persist_when_storage_path_is_used(self) -> None:
         with TemporaryDirectory() as tmp_dir:
@@ -82,6 +83,7 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertEqual(overview["total_scans"], 1)
             self.assertEqual(len(similar_groups), 1)
             self.assertEqual(similar_groups[0]["example_urls"][0], saved.url)
+            self.assertIn("prediction_probability", second_service._records[0].ml_analysis)
 
 
 if __name__ == "__main__":
