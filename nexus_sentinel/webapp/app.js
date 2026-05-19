@@ -466,6 +466,14 @@ function buildMlSummary(mlAnalysis) {
         <p class="fact-label">Explanation style</p>
         <p class="fact-value">${humanizeMethod(mlAnalysis.explanation_method)}</p>
       </div>
+      <div class="fact-item">
+        <p class="fact-label">Training source</p>
+        <p class="fact-value">${mlAnalysis.training_source || "Unknown"}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Training samples</p>
+        <p class="fact-value">${mlAnalysis.training_samples || "Unknown"}</p>
+      </div>
     </div>
     <div class="ml-meta-row">
       <span class="meta-pill">Method: ${humanizeMethod(mlAnalysis.explanation_method)}</span>
