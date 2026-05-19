@@ -519,6 +519,13 @@ button:disabled {
   gap: 4px;
 }
 
+.factor-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .factor-title,
 .tip-title {
   margin-bottom: 0;
@@ -539,6 +546,61 @@ button:disabled {
 .factor-points {
   font-size: 13px;
   font-weight: 700;
+}
+
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tooltip-wrap:focus {
+  outline: none;
+}
+
+.tooltip-trigger {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface);
+  cursor: help;
+}
+
+.tooltip-bubble {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 8px);
+  z-index: 10;
+  width: min(260px, 70vw);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--factor-text);
+  font-size: 12px;
+  line-height: 1.5;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition:
+    opacity 150ms ease,
+    transform 150ms ease,
+    visibility 150ms ease;
+}
+
+.tooltip-wrap:hover .tooltip-bubble,
+.tooltip-wrap:focus-within .tooltip-bubble {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
 }
 
 .factor-bad ~ .factor-points {
@@ -576,7 +638,8 @@ button:disabled {
 .content-status-row,
 .batch-upload-actions,
 .batch-results-header,
-.meta-strip {
+.meta-strip,
+.ml-probability-row {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -641,6 +704,18 @@ button:disabled {
 .example-url {
   font-family: "SFMono-Regular", Consolas, monospace;
   color: var(--accent-strong);
+}
+
+.ml-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.ml-probability {
+  margin-bottom: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 .batch-url-cell {

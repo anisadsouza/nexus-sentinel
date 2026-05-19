@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from nexus_sentinel.ml import build_ml_analysis
 from nexus_sentinel.url_features import UrlFeatures, extract_url_features
 
 
@@ -14,6 +15,7 @@ class DetectionResult:
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
     redirect_analysis: dict[str, object]
+    ml_analysis: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
@@ -32,15 +34,22 @@ def analyze_url_with_live_checks(
     score, factors, breakdown = _score_features(
         features, content_analysis, redirect_analysis
     )
+    serialized_features = _serialize_features(features)
+    ml_analysis = build_ml_analysis(
+        serialized_features,
+        content_analysis,
+        redirect_analysis,
+    )
 
     return DetectionResult(
         risk_score=score,
         classification=_classify(score),
         risk_factors=tuple(factors),
-        extracted_features=_serialize_features(features),
+        extracted_features=serialized_features,
         score_breakdown=tuple(breakdown),
         content_analysis=content_analysis,
         redirect_analysis=redirect_analysis,
+        ml_analysis=ml_analysis,
     )
 
 

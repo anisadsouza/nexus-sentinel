@@ -152,6 +152,7 @@ function renderResult(data) {
   const features = data.extracted_features || {};
   const contentAnalysis = data.content_analysis || {};
   const redirectAnalysis = data.redirect_analysis || {};
+  const mlAnalysis = data.ml_analysis || {};
   const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
 
@@ -232,6 +233,15 @@ function renderResult(data) {
         <div class="fact-grid">${buildRedirectRows(redirectAnalysis)}</div>
       </section>
 
+      <section class="result-card">
+        <p class="section-kicker">Model check</p>
+        <div class="ml-summary">
+          ${buildMlSummary(mlAnalysis)}
+        </div>
+      </section>
+    </div>
+
+    <div class="result-grid result-grid-secondary">
       <section class="result-card">
         <p class="section-kicker">What this means</p>
         <div class="info-list">${buildTips(data, features)}</div>
@@ -368,14 +378,68 @@ function buildRiskRows(scoreBreakdown) {
         <div class="factor-row">
           <span class="factor-icon ${toneClass}">!</span>
           <div class="factor-copy">
-            <p class="factor-title">${item.title || item.reason}</p>
-            <p class="factor-impact">${item.impact || item.reason}</p>
+            <div class="factor-title-row">
+              <p class="factor-title">${item.title || item.reason}</p>
+              <span class="tooltip-wrap" tabindex="0">
+                <span class="tooltip-trigger" aria-label="Why this matters">?</span>
+                <span class="tooltip-bubble">
+                  ${item.impact || item.reason}
+                </span>
+              </span>
+            </div>
+            <p class="factor-impact">${item.reason}</p>
           </div>
           <span class="factor-points">+${item.points}</span>
         </div>
       `;
     })
     .join("");
+}
+
+function buildMlSummary(mlAnalysis) {
+  if (mlAnalysis.status !== "available") {
+    return `
+      <p class="factor-impact">${mlAnalysis.notes || "The model explanation is unavailable right now."}</p>
+    `;
+  }
+
+  const signals = Array.isArray(mlAnalysis.top_signals) ? mlAnalysis.top_signals : [];
+  const signalMarkup = signals.length
+    ? signals
+        .map(
+          (signal) => `
+            <div class="factor-row">
+              <span class="factor-icon ${signal.direction === "raises risk" ? "factor-warn" : "factor-good"}">
+                ${signal.direction === "raises risk" ? "!" : "✓"}
+              </span>
+              <div class="factor-copy">
+                <div class="factor-title-row">
+                  <p class="factor-title">${signal.label}</p>
+                  <span class="tooltip-wrap" tabindex="0">
+                    <span class="tooltip-trigger" aria-label="Why this matters">?</span>
+                    <span class="tooltip-bubble">
+                      ${signal.description}
+                    </span>
+                  </span>
+                </div>
+                <p class="factor-impact">${sentenceCase(signal.direction)}</p>
+              </div>
+            </div>
+          `
+        )
+        .join("")
+    : `<p class="factor-impact">No standout model signals were available.</p>`;
+
+  return `
+    <div class="ml-probability-row">
+      <span class="risk-pill ${statusClass(mlAnalysis.predicted_classification)}">
+        ${sentenceCase(mlAnalysis.predicted_classification)}
+      </span>
+      <p class="ml-probability">${mlAnalysis.prediction_probability}% model risk</p>
+    </div>
+    <p class="factor-impact">${mlAnalysis.notes || ""}</p>
+    <div class="factor-list">${signalMarkup}</div>
+  `;
 }
 
 function buildGoodSignalRows(features) {

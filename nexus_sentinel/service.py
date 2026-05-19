@@ -25,6 +25,7 @@ class AnalysisRecord:
     score_breakdown: tuple[dict[str, object], ...]
     content_analysis: dict[str, object]
     redirect_analysis: dict[str, object]
+    ml_analysis: dict[str, object]
     similar_group_id: str
     similar_group_size: int
 
@@ -149,6 +150,7 @@ class AnalysisService:
                 score_breakdown=tuple(item.get("score_breakdown", ())),
                 content_analysis=dict(item.get("content_analysis", {})),
                 redirect_analysis=dict(item.get("redirect_analysis", {})),
+                ml_analysis=dict(item.get("ml_analysis", {})),
                 similar_group_id=item.get(
                     "similar_group_id",
                     _similar_group_id_for(dict(item.get("extracted_features", {}))),
@@ -197,6 +199,7 @@ class AnalysisService:
             score_breakdown=detection.score_breakdown,
             content_analysis=detection.content_analysis,
             redirect_analysis=detection.redirect_analysis,
+            ml_analysis=detection.ml_analysis,
             similar_group_id=similar_group_id,
             similar_group_size=similar_group_size,
         )

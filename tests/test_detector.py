@@ -15,6 +15,8 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.score_breakdown, ())
         self.assertEqual(result.content_analysis["status"], "not_fetched")
         self.assertEqual(result.redirect_analysis["status"], "not_fetched")
+        self.assertEqual(result.ml_analysis["status"], "available")
+        self.assertIn("prediction_probability", result.ml_analysis)
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(
@@ -73,6 +75,7 @@ class DetectorTests(unittest.TestCase):
 
         self.assertEqual(result.content_analysis["status"], "fetched")
         self.assertEqual(result.redirect_analysis["status"], "fetched")
+        self.assertEqual(result.ml_analysis["status"], "available")
         self.assertIn("Page asks for a password", result.risk_factors)
         self.assertIn("Link uses a suspicious redirect chain", result.risk_factors)
         self.assertTrue(
@@ -84,6 +87,7 @@ class DetectorTests(unittest.TestCase):
                 for item in result.score_breakdown
             )
         )
+        self.assertIn(result.ml_analysis["explanation_method"], {"shap", "fallback_proxy"})
 
 
 if __name__ == "__main__":
