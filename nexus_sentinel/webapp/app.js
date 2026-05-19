@@ -279,6 +279,7 @@ function renderBatchResults(data) {
             <th>URL</th>
             <th>Result</th>
             <th>Score</th>
+            <th>Model Risk</th>
             <th>Similar Links</th>
           </tr>
         </thead>
@@ -286,11 +287,30 @@ function renderBatchResults(data) {
           ${results
             .map(
               (item) => `
-                <tr>
+                <tr class="batch-row-main">
                   <td class="batch-url-cell" title="${item.url}">${item.url}</td>
                   <td><span class="risk-pill ${statusClass(item.classification)}">${sentenceCase(item.classification)}</span></td>
                   <td>${item.risk_score}</td>
+                  <td>${formatModelRisk(item.ml_analysis)}</td>
                   <td>${item.similar_group_size}</td>
+                </tr>
+                <tr class="batch-row-detail">
+                  <td colspan="5">
+                    <div class="batch-detail-grid">
+                      <div class="batch-detail-card">
+                        <p class="section-kicker">Top Rule Signals</p>
+                        <div class="batch-signal-list">
+                          ${buildBatchRuleSignals(item.score_breakdown)}
+                        </div>
+                      </div>
+                      <div class="batch-detail-card">
+                        <p class="section-kicker">Model Signals</p>
+                        <div class="batch-signal-list">
+                          ${buildBatchModelSignals(item.ml_analysis)}
+                        </div>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               `
             )
@@ -437,6 +457,16 @@ function buildMlSummary(mlAnalysis) {
       </span>
       <p class="ml-probability">${mlAnalysis.prediction_probability}% model risk</p>
     </div>
+    <div class="ml-comparison-grid">
+      <div class="fact-item">
+        <p class="fact-label">Model name</p>
+        <p class="fact-value">${mlAnalysis.model_name || "Unknown"}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Explanation style</p>
+        <p class="fact-value">${humanizeMethod(mlAnalysis.explanation_method)}</p>
+      </div>
+    </div>
     <div class="ml-meta-row">
       <span class="meta-pill">Method: ${humanizeMethod(mlAnalysis.explanation_method)}</span>
       <span class="meta-pill ${mlAnalysis.shap_status === "available" ? "ml-pill-ready" : "ml-pill-pending"}">
@@ -445,6 +475,12 @@ function buildMlSummary(mlAnalysis) {
     </div>
     <p class="factor-impact">${mlAnalysis.notes || ""}</p>
     <div class="factor-list">${signalMarkup}</div>
+    <details class="advanced-details">
+      <summary>Model feature vector</summary>
+      <div class="advanced-detail-grid">
+        ${buildFeatureVectorRows(mlAnalysis.feature_vector)}
+      </div>
+    </details>
   `;
 }
 
@@ -578,6 +614,85 @@ function buildTips(data, features) {
         <div class="info-row">
           <span class="factor-icon factor-good">i</span>
           <span class="factor-text">${tip}</span>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildFeatureVectorRows(featureVector) {
+  if (!featureVector || typeof featureVector !== "object") {
+    return '<p class="advanced-detail-row"><span>Feature vector</span><span>Unavailable</span></p>';
+  }
+
+  return Object.entries(featureVector)
+    .map(
+      ([name, value]) => `
+        <p class="advanced-detail-row">
+          <span>${humanizeFeatureName(name)}</span>
+          <span>${value}</span>
+        </p>
+      `
+    )
+    .join("");
+}
+
+function humanizeFeatureName(name) {
+  return String(name || "")
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatModelRisk(mlAnalysis) {
+  if (!mlAnalysis || mlAnalysis.status !== "available") {
+    return "Unavailable";
+  }
+  return `${mlAnalysis.prediction_probability}%`;
+}
+
+function buildBatchRuleSignals(scoreBreakdown) {
+  const items = Array.isArray(scoreBreakdown) ? scoreBreakdown.slice(0, 3) : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No major rule signals were triggered.</p>';
+  }
+
+  return items
+    .map(
+      (item) => `
+        <div class="batch-signal-item">
+          <span class="risk-pill ${item.points >= 12 ? "status-phishing" : "status-suspicious"}">+${item.points}</span>
+          <div>
+            <p class="factor-title">${item.title || item.reason}</p>
+            <p class="factor-impact">${item.impact || item.reason}</p>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildBatchModelSignals(mlAnalysis) {
+  if (!mlAnalysis || mlAnalysis.status !== "available") {
+    return '<p class="factor-impact">Model output unavailable.</p>';
+  }
+
+  const items = Array.isArray(mlAnalysis.top_signals) ? mlAnalysis.top_signals : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No standout model signals were found.</p>';
+  }
+
+  return items
+    .map(
+      (signal) => `
+        <div class="batch-signal-item">
+          <span class="risk-pill ${signal.direction === "raises risk" ? "status-suspicious" : "status-safe"}">
+            ${signal.direction === "raises risk" ? "Risk" : "Low"}
+          </span>
+          <div>
+            <p class="factor-title">${signal.label}</p>
+            <p class="factor-impact">${signal.description}</p>
+          </div>
         </div>
       `
     )
