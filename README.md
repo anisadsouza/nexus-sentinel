@@ -85,34 +85,18 @@ NexusSentinel/
 └── README.md
 ```
 
-## Run It Locally
+## Current Development State
 
-From the project root:
+Nexus Sentinel is currently in an active build stage.
 
-```bash
-python3 -m nexus_sentinel.web
-```
+Right now the project is focused on:
 
-For the full ML + SHAP experience, use the local virtual environment:
+- improving the phishing detection flow
+- making the explanations clearer for normal users
+- strengthening the ML and SHAP layers
+- shaping the dashboard into something deployment-ready
 
-```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-ml.txt
-.venv/bin/python -m nexus_sentinel.web
-```
-
-### Port behavior
-
-The app **tries to start on `http://127.0.0.1:9010` first**.
-
-If port `9010` is already occupied by another process, it automatically tries the next free port in the local range and prints the exact URL in the terminal.
-
-So:
-
-- expected default: `http://127.0.0.1:9010`
-- fallback example: `http://127.0.0.1:9011`
-
-The terminal output is the source of truth for which port is active.
+The intention is to deploy Nexus Sentinel later as a hosted web product, not keep it as a local setup guide.
 
 ## Privacy
 
@@ -124,7 +108,7 @@ The dashboard is now intended to behave as a **private local tool**.
 
 Important note:
 
-This is still a local development app, not a multi-user system with accounts. If you later want shared users, private workspaces, or user-specific history, that will need proper authentication and storage separation.
+This is still a development-stage product, not yet a deployed multi-user system with authentication or per-user workspaces.
 
 ## What Is Already Working
 
@@ -141,3 +125,22 @@ This is still a local development app, not a multi-user system with accounts. If
 - true SHAP explanations when the app is run from the local `.venv`
 - theme toggle
 - test coverage for core flows
+
+## What Is Still Ahead
+
+- training the ML model on real phishing and benign datasets
+- strengthening deployment and hosting
+- adding authentication and user isolation
+- moving to production-grade storage
+- expanding analyst reporting and export workflows
+- optionally adding LIME alongside SHAP
+
+## Direction
+
+The long-term direction for Nexus Sentinel is:
+
+- a deployed web product
+- strong explainability without a confusing interface
+- better model quality with real data
+- private-by-default user experience
+- practical analyst workflows such as batch triage and campaign understanding
