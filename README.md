@@ -127,6 +127,19 @@ This is still a development-stage product, not yet a deployed multi-user system 
 - theme toggle
 - test coverage for core flows
 
+## Current Model Benchmark
+
+The current dataset-backed Random Forest model is trained from the bundled balanced phishing URL dataset and evaluated on a held-out test split.
+
+- training samples: `16000`
+- test samples: `4000`
+- accuracy: `0.8905`
+- precision: `0.9194`
+- recall: `0.8560`
+- F1 score: `0.8866`
+
+This is a useful step forward from synthetic training, but it is still not the final model. The next improvement is broadening the training data so the model sees more modern and varied phishing patterns.
+
 ## What Is Still Ahead
 
 - improving model quality with broader and more modern phishing/benign datasets
