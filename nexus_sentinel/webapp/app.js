@@ -14,6 +14,9 @@ const clearUrlButton = document.getElementById("clear-url");
 const workspaceTabs = Array.from(document.querySelectorAll(".workspace-tab"));
 const workspacePanels = Array.from(document.querySelectorAll(".workspace-panel"));
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
+let currentBatchData = null;
+let batchFilterValue = "all";
+let batchSortValue = "score_desc";
 
 applyTheme(loadThemePreference());
 loadModelReport();
@@ -253,13 +256,27 @@ function renderResult(data) {
 }
 
 function renderBatchResults(data) {
-  const summary = data.summary || {};
-  const results = Array.isArray(data.results) ? data.results : [];
+  currentBatchData = {
+    summary: data.summary || {},
+    results: Array.isArray(data.results) ? data.results : [],
+  };
 
-  if (!results.length) {
+  if (!currentBatchData.results.length) {
     batchResults.innerHTML = '<p class="muted">No URLs were analyzed from this file.</p>';
     return;
   }
+
+  renderBatchWorkspace();
+}
+
+function renderBatchWorkspace() {
+  if (!currentBatchData) {
+    batchResults.innerHTML = '<p class="muted">No batch upload yet.</p>';
+    return;
+  }
+
+  const summary = currentBatchData.summary || {};
+  const results = getFilteredBatchResults();
 
   batchResults.innerHTML = `
     <div class="batch-results-header">
@@ -268,11 +285,35 @@ function renderBatchResults(data) {
         <h2>CSV analysis results</h2>
       </div>
       <div class="meta-strip">
-        <span class="meta-pill">${summary.total_urls || results.length} scanned</span>
+        <span class="meta-pill">${summary.total_urls || currentBatchData.results.length} scanned</span>
         <span class="meta-pill">${summary.safe || 0} safe</span>
         <span class="meta-pill">${summary.suspicious || 0} suspicious</span>
         <span class="meta-pill">${summary.phishing || 0} phishing</span>
       </div>
+    </div>
+    <div class="batch-summary-cards">
+      ${buildBatchSummaryCards(summary)}
+    </div>
+    <div class="batch-toolbar">
+      <label class="batch-control">
+        <span>Show</span>
+        <select id="batch-filter">
+          <option value="all">All results</option>
+          <option value="phishing">Likely phishing</option>
+          <option value="suspicious">Use caution</option>
+          <option value="safe">Looks safe</option>
+        </select>
+      </label>
+      <label class="batch-control">
+        <span>Sort</span>
+        <select id="batch-sort">
+          <option value="score_desc">Highest risk first</option>
+          <option value="score_asc">Lowest risk first</option>
+          <option value="model_desc">Highest model risk first</option>
+          <option value="url_asc">URL A-Z</option>
+        </select>
+      </label>
+      <button id="batch-export-button" type="button" class="secondary">Download CSV</button>
     </div>
     <div class="batch-table-wrap">
       <table class="batch-table">
@@ -298,20 +339,23 @@ function renderBatchResults(data) {
                 </tr>
                 <tr class="batch-row-detail">
                   <td colspan="5">
-                    <div class="batch-detail-grid">
-                      <div class="batch-detail-card">
-                        <p class="section-kicker">Top Rule Signals</p>
-                        <div class="batch-signal-list">
-                          ${buildBatchRuleSignals(item.score_breakdown)}
+                    <details class="batch-detail-toggle">
+                      <summary>Why this was flagged</summary>
+                      <div class="batch-detail-grid">
+                        <div class="batch-detail-card">
+                          <p class="section-kicker">Top Rule Signals</p>
+                          <div class="batch-signal-list">
+                            ${buildBatchRuleSignals(item.score_breakdown)}
+                          </div>
+                        </div>
+                        <div class="batch-detail-card">
+                          <p class="section-kicker">Model Signals</p>
+                          <div class="batch-signal-list">
+                            ${buildBatchModelSignals(item.ml_analysis)}
+                          </div>
                         </div>
                       </div>
-                      <div class="batch-detail-card">
-                        <p class="section-kicker">Model Signals</p>
-                        <div class="batch-signal-list">
-                          ${buildBatchModelSignals(item.ml_analysis)}
-                        </div>
-                      </div>
-                    </div>
+                    </details>
                   </td>
                 </tr>
               `
@@ -321,6 +365,8 @@ function renderBatchResults(data) {
       </table>
     </div>
   `;
+
+  bindBatchControls();
 }
 
 async function loadModelReport() {
@@ -486,6 +532,7 @@ function buildMlSummary(mlAnalysis) {
         ${sentenceCase(mlAnalysis.predicted_classification)}
       </span>
       <p class="ml-probability">${mlAnalysis.prediction_probability}% model risk</p>
+      <span class="meta-pill">${sentenceCase(mlAnalysis.confidence_label || "unknown confidence")}</span>
     </div>
     <div class="ml-comparison-grid">
       <div class="fact-item">
@@ -503,6 +550,14 @@ function buildMlSummary(mlAnalysis) {
       <div class="fact-item">
         <p class="fact-label">Training samples</p>
         <p class="fact-value">${mlAnalysis.training_samples || "Unknown"}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Model version</p>
+        <p class="fact-value">${mlAnalysis.model_version || "Unknown"}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Calibration</p>
+        <p class="fact-value">${sentenceCase(mlAnalysis.calibration_method || "unknown")}</p>
       </div>
     </div>
     ${buildEvaluationGrid(mlAnalysis.evaluation)}
@@ -549,11 +604,11 @@ function buildModelReportPanel(report) {
       <div class="ml-comparison-grid">
         <div class="fact-item">
           <p class="fact-label">Model</p>
-          <p class="fact-value">Random Forest</p>
+          <p class="fact-value">${report.model_name || "Unknown"}</p>
         </div>
         <div class="fact-item">
           <p class="fact-label">Explainability</p>
-          <p class="fact-value">SHAP</p>
+          <p class="fact-value">${report.status === "available" ? "SHAP" : "Fallback proxy"}</p>
         </div>
         <div class="fact-item">
           <p class="fact-label">Dataset</p>
@@ -566,6 +621,28 @@ function buildModelReportPanel(report) {
       </div>
 
       ${buildEvaluationGrid(evaluation)}
+      ${buildConfusionMatrix(evaluation)}
+      <div class="model-report-grid">
+        <section class="model-report-section">
+          <p class="section-kicker">Most influential features</p>
+          <div class="factor-list">${buildGlobalFeatureRows(report.global_top_features)}</div>
+        </section>
+        <section class="model-report-section">
+          <p class="section-kicker">Training metadata</p>
+          <div class="fact-grid">
+            ${buildFactItem(["Model version", report.model_version || "Unknown"])}
+            ${buildFactItem(["Trained at", formatTimestamp(report.trained_at)])}
+            ${buildFactItem(["Calibration", sentenceCase(report.calibration_method || "unknown")])}
+            ${buildFactItem(["Benchmark runs saved", report.history_count ?? 0])}
+          </div>
+          <div class="factor-list model-candidate-list">
+            ${buildCandidateModelRows(report.candidate_models)}
+          </div>
+          <div class="model-report-actions">
+            <a class="report-link" href="/api/model-report/download">Download model report</a>
+          </div>
+        </section>
+      </div>
     </div>
   `;
 }
@@ -650,6 +727,16 @@ function buildContentRows(contentAnalysis) {
     ["Password field", booleanLabel(contentAnalysis.password_field_detected)],
     ["Urgency wording", booleanLabel(contentAnalysis.urgency_language_detected)],
     ["Outside scripts", booleanLabel(contentAnalysis.external_scripts_detected)],
+    ["Form count", contentAnalysis.form_count ?? "Not fetched"],
+    ["External form action", booleanLabel(contentAnalysis.form_action_external_detected)],
+    ["Brand wording mismatch", booleanLabel(contentAnalysis.brand_impersonation_clues_detected)],
+    [
+      "Brand words seen",
+      Array.isArray(contentAnalysis.brand_keywords_detected) && contentAnalysis.brand_keywords_detected.length
+        ? contentAnalysis.brand_keywords_detected.join(", ")
+        : "None",
+    ],
+    ["Embedded frame", booleanLabel(contentAnalysis.iframe_detected)],
   ];
 
   return facts.map(buildFactItem).join("");
@@ -659,7 +746,11 @@ function buildRedirectRows(redirectAnalysis) {
   const facts = [
     ["Redirect count", redirectAnalysis.redirect_count ?? "Not fetched"],
     ["Final destination", redirectAnalysis.final_url || "Not fetched"],
+    ["Final scheme", redirectAnalysis.final_scheme || "Not fetched"],
+    ["Status code", redirectAnalysis.status_code ?? "Not fetched"],
     ["Different-site redirect", booleanLabel(redirectAnalysis.cross_domain_redirect_detected)],
+    ["Cross-domain hops", redirectAnalysis.cross_domain_hops ?? "Not fetched"],
+    ["HTTPS downgraded", booleanLabel(redirectAnalysis.downgrade_to_http_detected)],
     ["Suspicious redirect chain", booleanLabel(redirectAnalysis.suspicious_redirect_chain)],
   ];
 
@@ -692,6 +783,14 @@ function buildTips(data, features) {
 
   if (features.uses_https === false) {
     tips.push("Lack of HTTPS is a warning sign because information can be exposed more easily.");
+  }
+
+  if (data.content_analysis?.brand_impersonation_clues_detected) {
+    tips.push("The page mentions a known brand but the website name does not match, which is a common phishing trick.");
+  }
+
+  if (data.redirect_analysis?.downgrade_to_http_detected) {
+    tips.push("The link dropped from HTTPS to HTTP during redirecting, which weakens protection in transit.");
   }
 
   return tips
@@ -786,12 +885,63 @@ function buildBatchModelSignals(mlAnalysis) {
     .join("");
 }
 
+function buildGlobalFeatureRows(features) {
+  const items = Array.isArray(features) ? features : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No global feature importance summary is available yet.</p>';
+  }
+
+  return items
+    .map(
+      (item) => `
+        <div class="factor-row">
+          <span class="factor-icon factor-warn">i</span>
+          <div class="factor-copy">
+            <p class="factor-title">${item.label}</p>
+            <p class="factor-impact">${item.description}</p>
+            ${buildImportanceBar(item)}
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function buildCandidateModelRows(models) {
+  const items = Array.isArray(models) ? models : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No candidate model comparison is available.</p>';
+  }
+
+  return items
+    .map(
+      (item) => `
+        <div class="candidate-model-row">
+          <div>
+            <p class="factor-title">${item.model_name}</p>
+            <p class="factor-impact">F1 ${formatMetric(item.f1_score)} · Precision ${formatMetric(item.precision)} · Recall ${formatMetric(item.recall)}</p>
+          </div>
+        </div>
+      `
+    )
+    .join("");
+}
+
 function buildSignalBar(signal) {
   const width = Math.max(6, Math.min(Number(signal.strength_pct || 0), 100));
   const toneClass = signal.direction === "raises risk" ? "signal-meter-risk" : "signal-meter-safe";
   return `
     <div class="signal-meter">
       <div class="signal-meter-fill ${toneClass}" style="width: ${width}%"></div>
+    </div>
+  `;
+}
+
+function buildImportanceBar(signal) {
+  const width = Math.max(6, Math.min(Number(signal.strength_pct || 0), 100));
+  return `
+    <div class="signal-meter">
+      <div class="signal-meter-fill signal-meter-neutral" style="width: ${width}%"></div>
     </div>
   `;
 }
@@ -823,6 +973,33 @@ function buildEvaluationGrid(evaluation) {
   `;
 }
 
+function buildConfusionMatrix(evaluation) {
+  const matrix = evaluation && Array.isArray(evaluation.confusion_matrix)
+    ? evaluation.confusion_matrix
+    : null;
+
+  if (!matrix || matrix.length < 2 || !Array.isArray(matrix[0]) || !Array.isArray(matrix[1])) {
+    return '<p class="factor-impact">Confusion matrix unavailable in this interpreter.</p>';
+  }
+
+  return `
+    <div class="confusion-matrix-card">
+      <p class="section-kicker">Confusion Matrix</p>
+      <div class="confusion-matrix">
+        <div class="matrix-cell matrix-label"></div>
+        <div class="matrix-cell matrix-label">Predicted Safe</div>
+        <div class="matrix-cell matrix-label">Predicted Risky</div>
+        <div class="matrix-cell matrix-label">Actual Safe</div>
+        <div class="matrix-cell">${matrix[0][0] ?? 0}</div>
+        <div class="matrix-cell">${matrix[0][1] ?? 0}</div>
+        <div class="matrix-cell matrix-label">Actual Risky</div>
+        <div class="matrix-cell">${matrix[1][0] ?? 0}</div>
+        <div class="matrix-cell">${matrix[1][1] ?? 0}</div>
+      </div>
+    </div>
+  `;
+}
+
 function formatMetric(value) {
   if (value === undefined || value === null || Number.isNaN(Number(value))) {
     return "Unknown";
@@ -839,6 +1016,120 @@ function buildSplitLabel(trainRows, testRows) {
   const trainPct = Math.round((trainRows / total) * 100);
   const testPct = Math.round((testRows / total) * 100);
   return `${trainPct}/${testPct} (${trainRows.toLocaleString()} train, ${testRows.toLocaleString()} test)`;
+}
+
+function bindBatchControls() {
+  const filter = document.getElementById("batch-filter");
+  const sort = document.getElementById("batch-sort");
+  const exportButton = document.getElementById("batch-export-button");
+
+  if (filter) {
+    filter.value = batchFilterValue;
+    filter.addEventListener("change", () => {
+      batchFilterValue = filter.value;
+      renderBatchWorkspace();
+    });
+  }
+
+  if (sort) {
+    sort.value = batchSortValue;
+    sort.addEventListener("change", () => {
+      batchSortValue = sort.value;
+      renderBatchWorkspace();
+    });
+  }
+
+  if (exportButton) {
+    exportButton.addEventListener("click", downloadBatchCsv);
+  }
+}
+
+function getFilteredBatchResults() {
+  if (!currentBatchData) {
+    return [];
+  }
+
+  let results = currentBatchData.results.slice();
+
+  if (batchFilterValue !== "all") {
+    results = results.filter((item) => item.classification === batchFilterValue);
+  }
+
+  results.sort((left, right) => {
+    if (batchSortValue === "score_asc") {
+      return left.risk_score - right.risk_score;
+    }
+    if (batchSortValue === "model_desc") {
+      return getModelProbability(right.ml_analysis) - getModelProbability(left.ml_analysis);
+    }
+    if (batchSortValue === "url_asc") {
+      return left.url.localeCompare(right.url);
+    }
+    return right.risk_score - left.risk_score;
+  });
+
+  return results;
+}
+
+function buildBatchSummaryCards(summary) {
+  const items = [
+    ["Total links", summary.total_urls || 0],
+    ["Likely phishing", summary.phishing || 0],
+    ["Use caution", summary.suspicious || 0],
+    ["Looks safe", summary.safe || 0],
+  ];
+
+  return items
+    .map(
+      ([label, value]) => `
+        <div class="batch-summary-card">
+          <p class="fact-label">${label}</p>
+          <p class="batch-summary-value">${value}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function getModelProbability(mlAnalysis) {
+  if (!mlAnalysis || mlAnalysis.status !== "available") {
+    return -1;
+  }
+  return Number(mlAnalysis.prediction_probability || 0);
+}
+
+function downloadBatchCsv() {
+  if (!currentBatchData) {
+    return;
+  }
+
+  const rows = [
+    ["url", "classification", "risk_score", "model_risk", "similar_group_size"],
+    ...getFilteredBatchResults().map((item) => [
+      item.url,
+      item.classification,
+      item.risk_score,
+      formatModelRisk(item.ml_analysis),
+      item.similar_group_size,
+    ]),
+  ];
+  const csv = rows
+    .map((row) =>
+      row
+        .map((value) => `"${String(value).replaceAll('"', '""')}"`)
+        .join(",")
+    )
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = "nexus-sentinel-batch-results.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
 }
 
 function booleanLabel(value) {

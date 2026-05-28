@@ -358,6 +358,20 @@ button:disabled {
   align-self: flex-start;
 }
 
+.model-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.model-report-section {
+  display: grid;
+  gap: 12px;
+}
+
 .result-shell,
 .result-grid,
 .tips-layout {
@@ -675,6 +689,7 @@ button:disabled {
 .content-status-row,
 .batch-upload-actions,
 .batch-results-header,
+.batch-toolbar,
 .meta-strip,
 .ml-probability-row {
   display: flex;
@@ -739,6 +754,50 @@ button:disabled {
 
 .batch-table-wrap {
   overflow-x: auto;
+}
+
+.batch-summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.batch-summary-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.batch-summary-value {
+  margin-bottom: 0;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.batch-toolbar {
+  margin-bottom: 14px;
+  justify-content: space-between;
+}
+
+.batch-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.batch-control select {
+  min-height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--input-bg);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
 }
 
 .batch-table {
@@ -808,6 +867,18 @@ button:disabled {
   background: var(--surface);
 }
 
+.batch-detail-toggle {
+  margin-top: 8px;
+}
+
+.batch-detail-toggle summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
 .batch-signal-list {
   display: grid;
   gap: 10px;
@@ -842,6 +913,10 @@ button:disabled {
   background: var(--green-text);
 }
 
+.signal-meter-neutral {
+  background: var(--accent);
+}
+
 .batch-url-cell {
   max-width: 0;
   white-space: nowrap;
@@ -864,11 +939,66 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.candidate-model-row {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.model-candidate-list {
+  margin-top: 14px;
+}
+
+.model-report-actions {
+  margin-top: 14px;
+}
+
+.report-link {
+  color: var(--accent-strong);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.report-link:hover {
+  text-decoration: underline;
+}
+
+.confusion-matrix-card {
+  margin-top: 14px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.confusion-matrix {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 8px;
+}
+
+.matrix-cell {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.matrix-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
 @media (max-width: 860px) {
   .input-row,
   .result-shell,
   .result-grid,
-  .tips-layout {
+  .tips-layout,
+  .model-report-grid {
     grid-template-columns: 1fr;
   }
 
@@ -880,6 +1010,10 @@ button:disabled {
   .batch-detail-grid,
   .ml-evaluation-grid {
     grid-template-columns: 1fr;
+  }
+
+  .batch-summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .model-report-header {
@@ -911,6 +1045,11 @@ button:disabled {
 
   .workspace-tabs {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .batch-summary-cards,
+  .confusion-matrix {
     grid-template-columns: 1fr;
   }
 }

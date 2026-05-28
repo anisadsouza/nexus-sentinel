@@ -67,6 +67,13 @@ class DashboardApp:
                 200,
                 {"model_report": get_model_report()},
             )
+        if path == "/api/model-report/download":
+            return self._json_download_response(
+                start_response,
+                200,
+                {"model_report": get_model_report()},
+                filename="nexus-sentinel-model-report.json",
+            )
         return self._json_response(start_response, 404, {"error": "Not found"})
 
     def _handle_analyze(self, environ: dict, start_response) -> list[bytes]:
@@ -155,6 +162,20 @@ class DashboardApp:
     def _json_response(
         self, start_response, status_code: int, payload: dict[str, object]
     ) -> list[bytes]:
+        return self._json_download_response(
+            start_response,
+            status_code,
+            payload,
+            filename=None,
+        )
+
+    def _json_download_response(
+        self,
+        start_response,
+        status_code: int,
+        payload: dict[str, object],
+        filename: str | None,
+    ) -> list[bytes]:
         body = json.dumps(payload).encode("utf-8")
         status_text = {
             200: "200 OK",
@@ -162,7 +183,12 @@ class DashboardApp:
             404: "404 Not Found",
             405: "405 Method Not Allowed",
         }[status_code]
-        start_response(status_text, [("Content-Type", "application/json")])
+        headers = [("Content-Type", "application/json")]
+        if filename:
+            headers.append(
+                ("Content-Disposition", f'attachment; filename="{filename}"')
+            )
+        start_response(status_text, headers)
         return [body]
 
     def _read_json_body(self, environ: dict) -> dict[str, object]:
