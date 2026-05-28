@@ -141,6 +141,17 @@ class DashboardAppTests(unittest.TestCase):
         payload = json.loads(body)
         self.assertIn("No valid URLs", payload["error"])
 
+    def test_model_report_endpoint_returns_report_payload(self) -> None:
+        app = DashboardApp()
+
+        status, headers, body = _run_app(app, path="/api/model-report")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertIn("model_report", payload)
+        self.assertIn("status", payload["model_report"])
+
     def test_clear_history_endpoint_is_not_available(self) -> None:
         app = DashboardApp()
 
