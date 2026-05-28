@@ -443,6 +443,7 @@ function buildMlSummary(mlAnalysis) {
                   </span>
                 </div>
                 <p class="factor-impact">${sentenceCase(signal.direction)}</p>
+                ${buildSignalBar(signal)}
               </div>
             </div>
           `
@@ -475,6 +476,7 @@ function buildMlSummary(mlAnalysis) {
         <p class="fact-value">${mlAnalysis.training_samples || "Unknown"}</p>
       </div>
     </div>
+    ${buildEvaluationGrid(mlAnalysis.evaluation)}
     <div class="ml-meta-row">
       <span class="meta-pill">Method: ${humanizeMethod(mlAnalysis.explanation_method)}</span>
       <span class="meta-pill ${mlAnalysis.shap_status === "available" ? "ml-pill-ready" : "ml-pill-pending"}">
@@ -700,11 +702,56 @@ function buildBatchModelSignals(mlAnalysis) {
           <div>
             <p class="factor-title">${signal.label}</p>
             <p class="factor-impact">${signal.description}</p>
+            ${buildSignalBar(signal)}
           </div>
         </div>
       `
     )
     .join("");
+}
+
+function buildSignalBar(signal) {
+  const width = Math.max(6, Math.min(Number(signal.strength_pct || 0), 100));
+  const toneClass = signal.direction === "raises risk" ? "signal-meter-risk" : "signal-meter-safe";
+  return `
+    <div class="signal-meter">
+      <div class="signal-meter-fill ${toneClass}" style="width: ${width}%"></div>
+    </div>
+  `;
+}
+
+function buildEvaluationGrid(evaluation) {
+  if (!evaluation || typeof evaluation !== "object" || !Object.keys(evaluation).length) {
+    return '<p class="factor-impact">No evaluation summary is available in this interpreter.</p>';
+  }
+
+  return `
+    <div class="ml-evaluation-grid">
+      <div class="fact-item">
+        <p class="fact-label">Accuracy</p>
+        <p class="fact-value">${formatMetric(evaluation.accuracy)}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Precision</p>
+        <p class="fact-value">${formatMetric(evaluation.precision)}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Recall</p>
+        <p class="fact-value">${formatMetric(evaluation.recall)}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">F1 Score</p>
+        <p class="fact-value">${formatMetric(evaluation.f1_score)}</p>
+      </div>
+    </div>
+  `;
+}
+
+function formatMetric(value) {
+  if (value === undefined || value === null || Number.isNaN(Number(value))) {
+    return "Unknown";
+  }
+  return Number(value).toFixed(4);
 }
 
 function booleanLabel(value) {
