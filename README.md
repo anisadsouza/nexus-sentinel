@@ -30,7 +30,7 @@ The result includes:
 - plain-language explanations of why the link was flagged
 - page check details
 - destination check details
-- a lightweight model check with explanation signals
+- an ML model check with explanation signals
 
 ### 2. Batch URL Upload
 
@@ -63,6 +63,20 @@ The goal is not just detection. It is also helping the person using the tool und
 - optional local ML stack in `requirements-ml.txt`
 
 No framework has been added yet. This is still a lightweight local build.
+
+## ML and Explainability
+
+Nexus Sentinel now includes a real dataset-backed ML layer alongside the rule engine.
+
+- model: `RandomForestClassifier`
+- explanation layer: `SHAP`
+- dataset: `ESDAUNG PhishDataset balanced set`
+- dataset size: `20,000` labeled URL rows
+- split: `80/20` train/test
+- training rows: `16,000`
+- test rows: `4,000`
+
+The trained model and evaluation report are cached locally for reuse during development. The dashboard also surfaces model confidence signals and SHAP-backed explanations when the app is run through the local `.venv`.
 
 ## Project Structure
 
@@ -110,7 +124,7 @@ Important note:
 
 This is still a development-stage product, not yet a deployed multi-user system with authentication or per-user workspaces.
 
-## What Is Already Working
+## Current Model workflow 
 
 - single URL analysis
 - risk scoring
@@ -120,16 +134,16 @@ This is still a development-stage product, not yet a deployed multi-user system 
 - batch CSV analysis
 - plain-language risk explanations
 - tooltip-based "Why this matters" explanations
-- lightweight local ML model output
-- SHAP readiness/status reporting in the UI
-- true SHAP explanations when the app is run from the local `.venv`
-- real dataset-backed model training through the bundled phishing URL dataset
+- ML model output from a real dataset-backed Random Forest classifier
+- SHAP-based explanations in the UI when the app is run from the local `.venv`
+- fallback model behavior when the full local ML stack is unavailable
+- cached training artifacts and evaluation report for the current model
 - theme toggle
 - test coverage for core flows
 
 ## Current Model Benchmark
 
-The current dataset-backed Random Forest model is trained from the bundled balanced phishing URL dataset and evaluated on a held-out test split.
+The current dataset-backed Random Forest model is trained from the bundled balanced phishing URL dataset and evaluated on a held-out `80/20` split.
 
 - training samples: `16000`
 - test samples: `4000`
@@ -140,21 +154,3 @@ The current dataset-backed Random Forest model is trained from the bundled balan
 
 This is a useful step forward from synthetic training, but it is still not the final model. The next improvement is broadening the training data so the model sees more modern and varied phishing patterns.
 
-## What Is Still Ahead
-
-- improving model quality with broader and more modern phishing/benign datasets
-- strengthening deployment and hosting
-- adding authentication and user isolation
-- moving to production-grade storage
-- expanding analyst reporting and export workflows
-- optionally adding LIME alongside SHAP
-
-## Direction
-
-The long-term direction for Nexus Sentinel is:
-
-- a deployed web product
-- strong explainability without a confusing interface
-- better model quality with real data
-- private-by-default user experience
-- practical analyst workflows such as batch triage and campaign understanding

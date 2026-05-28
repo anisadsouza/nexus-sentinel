@@ -321,6 +321,43 @@ button:disabled {
   border-top: 1px solid var(--border);
 }
 
+.model-report-panel {
+  margin-top: 18px;
+}
+
+.model-report-card {
+  padding: 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.model-report-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.model-report-title {
+  margin-bottom: 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.model-report-copy {
+  margin-bottom: 0;
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 720px;
+}
+
+.model-report-pill {
+  align-self: flex-start;
+}
+
 .result-shell,
 .result-grid,
 .tips-layout {
@@ -843,6 +880,10 @@ button:disabled {
   .batch-detail-grid,
   .ml-evaluation-grid {
     grid-template-columns: 1fr;
+  }
+
+  .model-report-header {
+    flex-direction: column;
   }
 }
 

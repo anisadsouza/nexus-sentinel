@@ -7,6 +7,7 @@ const batchFileInput = document.getElementById("batch-file");
 const batchAnalyzeButton = document.getElementById("batch-analyze-button");
 const batchMessage = document.getElementById("batch-message");
 const batchResults = document.getElementById("batch-results");
+const modelReportPanel = document.getElementById("model-report-panel");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
@@ -15,6 +16,7 @@ const workspacePanels = Array.from(document.querySelectorAll(".workspace-panel")
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
 
 applyTheme(loadThemePreference());
+loadModelReport();
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.body.dataset.theme === "dark" ? "light" : "dark";
@@ -321,6 +323,33 @@ function renderBatchResults(data) {
   `;
 }
 
+async function loadModelReport() {
+  if (!modelReportPanel) {
+    return;
+  }
+
+  modelReportPanel.innerHTML = '<p class="muted">Loading model summary...</p>';
+
+  try {
+    const response = await fetch("/api/model-report");
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to load model summary.");
+    }
+
+    modelReportPanel.innerHTML = buildModelReportPanel(data.model_report || {});
+  } catch (error) {
+    modelReportPanel.innerHTML = `
+      <div class="model-report-card">
+        <p class="section-kicker">Model Report</p>
+        <h3 class="model-report-title">Model summary unavailable</h3>
+        <p class="factor-impact">${error.message}</p>
+      </div>
+    `;
+  }
+}
+
 function setAnalyzeButtonState(isLoading) {
   analyzeButton.disabled = isLoading;
   analyzeButton.textContent = isLoading ? "Analyzing..." : "Analyze";
@@ -491,6 +520,53 @@ function buildMlSummary(mlAnalysis) {
         ${buildFeatureVectorRows(mlAnalysis.feature_vector)}
       </div>
     </details>
+  `;
+}
+
+function buildModelReportPanel(report) {
+  const evaluation = report.evaluation || {};
+  const trainingSamples = report.training_samples ?? "Unknown";
+  const trainRows = evaluation.train_samples ?? "Unknown";
+  const testRows = evaluation.test_samples ?? "Unknown";
+  const splitLabel =
+    Number.isFinite(Number(trainRows)) && Number.isFinite(Number(testRows))
+      ? buildSplitLabel(Number(trainRows), Number(testRows))
+      : "Unknown split";
+
+  return `
+    <div class="model-report-card">
+      <div class="model-report-header">
+        <div>
+          <p class="section-kicker">Model Report</p>
+          <h3 class="model-report-title">Current ML snapshot</h3>
+          <p class="model-report-copy">
+            Real phishing data, cached training, and SHAP-backed explanations when the full ML environment is available.
+          </p>
+        </div>
+        <span class="meta-pill model-report-pill">${trainingSamples} rows</span>
+      </div>
+
+      <div class="ml-comparison-grid">
+        <div class="fact-item">
+          <p class="fact-label">Model</p>
+          <p class="fact-value">Random Forest</p>
+        </div>
+        <div class="fact-item">
+          <p class="fact-label">Explainability</p>
+          <p class="fact-value">SHAP</p>
+        </div>
+        <div class="fact-item">
+          <p class="fact-label">Dataset</p>
+          <p class="fact-value">${report.training_source || "Unknown"}</p>
+        </div>
+        <div class="fact-item">
+          <p class="fact-label">Train / test split</p>
+          <p class="fact-value">${splitLabel}</p>
+        </div>
+      </div>
+
+      ${buildEvaluationGrid(evaluation)}
+    </div>
   `;
 }
 
@@ -752,6 +828,17 @@ function formatMetric(value) {
     return "Unknown";
   }
   return Number(value).toFixed(4);
+}
+
+function buildSplitLabel(trainRows, testRows) {
+  const total = trainRows + testRows;
+  if (!total) {
+    return "Unknown split";
+  }
+
+  const trainPct = Math.round((trainRows / total) * 100);
+  const testPct = Math.round((testRows / total) * 100);
+  return `${trainPct}/${testPct} (${trainRows.toLocaleString()} train, ${testRows.toLocaleString()} test)`;
 }
 
 function booleanLabel(value) {
