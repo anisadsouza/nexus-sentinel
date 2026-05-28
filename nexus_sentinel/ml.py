@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from functools import lru_cache
 import json
 import math
@@ -167,8 +168,11 @@ _TRAINING_WEIGHTS = (
     0.95,
 )
 _MODEL_DIR = Path(__file__).resolve().parent.parent / "data" / "models"
-_MODEL_ARTIFACT_PATH = _MODEL_DIR / "random_forest_url_model.joblib"
-_MODEL_REPORT_PATH = _MODEL_DIR / "random_forest_url_model_report.json"
+_MODEL_ARTIFACT_PATH = _MODEL_DIR / "best_url_risk_model.joblib"
+_MODEL_REPORT_PATH = _MODEL_DIR / "best_url_risk_model_report.json"
+_MODEL_HISTORY_PATH = _MODEL_DIR / "best_url_risk_model_history.json"
+_MODEL_VERSION = "2026.05"
+_RISK_THRESHOLDS = {"safe": 0.35, "phishing": 0.70}
 
 
 @dataclass(frozen=True)
@@ -202,9 +206,9 @@ class _NaiveBayesModel:
 
 @dataclass(frozen=True)
 class _RealModelBundle:
-    model: object
-    metadata: dict[str, object]
-    evaluation: dict[str, object]
+    probability_model: object
+    explanation_model: object
+    report: dict[str, object]
 
 
 def build_ml_analysis(
@@ -241,22 +245,31 @@ def build_feature_vector_row(
 
 
 def get_model_report() -> dict[str, object]:
-    bundle = _get_real_model_bundle()
-    if bundle is not None:
-        return {
-            "status": "available",
-            "training_source": bundle.metadata["source"],
-            "training_samples": bundle.metadata["samples"],
-            "evaluation": bundle.evaluation,
-            "dataset_path": str(bundle.metadata["dataset_path"]),
-        }
+    cached_report = _load_cached_report_if_current()
+    if cached_report is not None:
+        report = dict(cached_report)
+        report["status"] = "available"
+        report["dataset_path"] = str(_resolve_dataset_path())
+        report["history"] = _read_report_history()
+        report["history_count"] = len(report["history"])
+        return report
 
     return {
         "status": "fallback",
+        "model_name": "SyntheticGaussianNaiveBayes",
+        "model_version": "fallback",
         "training_source": "synthetic fallback",
         "training_samples": 850,
-        "evaluation": {},
+        "trained_at": None,
         "dataset_path": str(_resolve_dataset_path()),
+        "dataset_version": "synthetic-fallback",
+        "calibration_method": "none",
+        "candidate_models": [],
+        "decision_thresholds": dict(_RISK_THRESHOLDS),
+        "global_top_features": [],
+        "evaluation": {},
+        "history": _read_report_history(),
+        "history_count": len(_read_report_history()),
     }
 
 
@@ -274,23 +287,34 @@ def _build_real_ml_analysis(
         return None
 
     vector_array = np.asarray(vector, dtype=float)
-    probability = float(bundle.model.predict_proba(vector_array.reshape(1, -1))[0][1])
+    probability = float(
+        bundle.probability_model.predict_proba(vector_array.reshape(1, -1))[0][1]
+    )
     predicted_classification = _classify_probability(probability)
-    top_signals = _build_shap_explanation(bundle.model, vector_array)
+    top_signals = _build_shap_explanation(bundle.explanation_model, vector_array)
+    report = bundle.report
 
     return {
         "status": "available",
-        "model_name": "RandomForestClassifier",
+        "model_name": str(report.get("model_name", "RandomForestClassifier")),
+        "model_version": str(report.get("model_version", _MODEL_VERSION)),
+        "trained_at": report.get("trained_at"),
+        "dataset_version": str(report.get("dataset_version", "unknown")),
+        "calibration_method": str(report.get("calibration_method", "unknown")),
         "prediction_probability": round(probability * 100, 1),
         "predicted_classification": predicted_classification,
+        "confidence_label": _confidence_label(probability),
         "explanation_method": "shap",
         "shap_status": "available",
         "feature_vector": feature_vector,
         "top_signals": top_signals,
-        "training_source": bundle.metadata["source"],
-        "training_samples": bundle.metadata["samples"],
-        "evaluation": bundle.evaluation,
-        "notes": "A local Random Forest model is active and this result uses true SHAP feature contributions from a real labeled phishing URL dataset.",
+        "global_top_features": list(report.get("global_top_features", [])),
+        "training_source": report.get("training_source", "Real URL dataset"),
+        "training_samples": report.get("training_samples", 0),
+        "candidate_models": list(report.get("candidate_models", [])),
+        "decision_thresholds": dict(report.get("decision_thresholds", _RISK_THRESHOLDS)),
+        "evaluation": dict(report.get("evaluation", {})),
+        "notes": "A calibrated local tree model is active and this result uses true SHAP feature contributions from a real labeled phishing URL dataset.",
     }
 
 
@@ -305,14 +329,22 @@ def _build_fallback_ml_analysis(
     return {
         "status": "available",
         "model_name": "SyntheticGaussianNaiveBayes",
+        "model_version": "fallback",
+        "trained_at": None,
+        "dataset_version": "synthetic-fallback",
+        "calibration_method": "none",
         "prediction_probability": round(probability * 100, 1),
         "predicted_classification": predicted_classification,
+        "confidence_label": _confidence_label(probability),
         "explanation_method": "feature_gap_proxy",
         "shap_status": "unavailable",
         "feature_vector": feature_vector,
         "top_signals": _build_proxy_explanation(model, vector),
+        "global_top_features": [],
         "training_source": "synthetic fallback",
         "training_samples": 850,
+        "candidate_models": [],
+        "decision_thresholds": dict(_RISK_THRESHOLDS),
         "evaluation": {},
         "notes": "A lightweight local model is active. SHAP or the real dataset-backed stack is not available in this interpreter, so the explanation below uses a simpler feature-gap proxy.",
     }
@@ -335,7 +367,13 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         import joblib
         import numpy as np
         import pandas as pd
-        from sklearn.ensemble import RandomForestClassifier
+        from sklearn.base import clone
+        from sklearn.calibration import CalibratedClassifierCV
+        from sklearn.ensemble import (
+            ExtraTreesClassifier,
+            GradientBoostingClassifier,
+            RandomForestClassifier,
+        )
         from sklearn.metrics import (
             accuracy_score,
             confusion_matrix,
@@ -352,23 +390,22 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         return None
 
     dataset_signature = _dataset_signature(dataset_path)
+    cached_report = _load_cached_report_if_current()
 
-    if _MODEL_ARTIFACT_PATH.exists() and _MODEL_REPORT_PATH.exists():
-      try:
-        report_payload = json.loads(_MODEL_REPORT_PATH.read_text(encoding="utf-8"))
-        if report_payload.get("dataset_signature") == dataset_signature:
-            model = joblib.load(_MODEL_ARTIFACT_PATH)
-            return _RealModelBundle(
-                model=model,
-                metadata={
-                    "source": str(report_payload.get("training_source", "Real URL dataset")),
-                    "samples": int(report_payload.get("training_samples", 0)),
-                    "dataset_path": dataset_path,
-                },
-                evaluation=dict(report_payload.get("evaluation", {})),
-            )
-      except Exception:
-        pass
+    if _MODEL_ARTIFACT_PATH.exists() and cached_report is not None:
+        try:
+            artifact = joblib.load(_MODEL_ARTIFACT_PATH)
+            if isinstance(artifact, dict) and {
+                "probability_model",
+                "explanation_model",
+            }.issubset(artifact):
+                return _RealModelBundle(
+                    probability_model=artifact["probability_model"],
+                    explanation_model=artifact["explanation_model"],
+                    report=cached_report,
+                )
+        except Exception:
+            pass
 
     frame = _read_dataset_frame(dataset_path, pd)
     if frame is None or "URLs" not in frame.columns or "Labels" not in frame.columns:
@@ -426,24 +463,73 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         stratify=labels_array,
     )
 
-    model = RandomForestClassifier(
-        n_estimators=200,
-        max_depth=10,
-        min_samples_leaf=2,
-        random_state=42,
-        n_jobs=-1,
+    candidate_factories = (
+        (
+            "RandomForestClassifier",
+            lambda: RandomForestClassifier(
+                n_estimators=220,
+                max_depth=12,
+                min_samples_leaf=2,
+                random_state=42,
+                n_jobs=-1,
+            ),
+        ),
+        (
+            "ExtraTreesClassifier",
+            lambda: ExtraTreesClassifier(
+                n_estimators=260,
+                max_depth=14,
+                min_samples_leaf=2,
+                random_state=42,
+                n_jobs=-1,
+            ),
+        ),
+        (
+            "GradientBoostingClassifier",
+            lambda: GradientBoostingClassifier(random_state=42),
+        ),
     )
-    model.fit(x_train, y_train)
 
-    predictions = model.predict(x_test)
+    evaluated_candidates: list[tuple[float, str, object, dict[str, float]]] = []
+
+    for name, factory in candidate_factories:
+        candidate = factory()
+        candidate.fit(x_train, y_train)
+        predictions = candidate.predict(x_test)
+        evaluation = {
+            "accuracy": round(float(accuracy_score(y_test, predictions)), 4),
+            "precision": round(float(precision_score(y_test, predictions)), 4),
+            "recall": round(float(recall_score(y_test, predictions)), 4),
+            "f1_score": round(float(f1_score(y_test, predictions)), 4),
+        }
+        evaluated_candidates.append((evaluation["f1_score"], name, candidate, evaluation))
+
+    evaluated_candidates.sort(key=lambda item: item[0], reverse=True)
+    _best_f1, best_name, explanation_model, quick_eval = evaluated_candidates[0]
+
+    probability_model, calibration_method = _build_calibrated_model(
+        base_model=clone(explanation_model),
+        x_train=x_train,
+        y_train=y_train,
+        calibrator_cls=CalibratedClassifierCV,
+    )
+
+    test_probabilities = probability_model.predict_proba(x_test)[:, 1]
+    predictions = (test_probabilities >= _RISK_THRESHOLDS["phishing"]).astype(int)
+    matrix = confusion_matrix(y_test, predictions)
+    false_positives = int(matrix[0][1]) if matrix.shape == (2, 2) else 0
+    false_negatives = int(matrix[1][0]) if matrix.shape == (2, 2) else 0
+
     evaluation = {
         "accuracy": round(float(accuracy_score(y_test, predictions)), 4),
         "precision": round(float(precision_score(y_test, predictions)), 4),
         "recall": round(float(recall_score(y_test, predictions)), 4),
         "f1_score": round(float(f1_score(y_test, predictions)), 4),
-        "confusion_matrix": confusion_matrix(y_test, predictions).tolist(),
+        "confusion_matrix": matrix.tolist(),
         "train_samples": int(x_train.shape[0]),
         "test_samples": int(x_test.shape[0]),
+        "false_positives": false_positives,
+        "false_negatives": false_negatives,
     }
 
     training_source = (
@@ -451,31 +537,68 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         if dataset_path == _DEFAULT_DATASET_PATH
         else dataset_path.stem
     )
+    trained_at = datetime.now(timezone.utc).isoformat()
+    candidate_models = [
+        {
+            "model_name": name,
+            "accuracy": candidate_eval["accuracy"],
+            "precision": candidate_eval["precision"],
+            "recall": candidate_eval["recall"],
+            "f1_score": candidate_eval["f1_score"],
+        }
+        for _score, name, _candidate, candidate_eval in evaluated_candidates
+    ]
+    global_top_features = _build_global_feature_summary(explanation_model)
+
+    report_payload = {
+        "dataset_signature": dataset_signature,
+        "model_name": best_name,
+        "model_version": _MODEL_VERSION,
+        "training_source": training_source,
+        "training_samples": int(labels_array.shape[0]),
+        "trained_at": trained_at,
+        "dataset_version": dataset_signature["mtime_ns"],
+        "calibration_method": calibration_method,
+        "candidate_models": candidate_models,
+        "decision_thresholds": dict(_RISK_THRESHOLDS),
+        "global_top_features": global_top_features,
+        "evaluation": evaluation,
+        "quick_eval_winner": quick_eval,
+    }
 
     _MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(model, _MODEL_ARTIFACT_PATH)
+    joblib.dump(
+        {
+            "probability_model": probability_model,
+            "explanation_model": explanation_model,
+        },
+        _MODEL_ARTIFACT_PATH,
+    )
     _MODEL_REPORT_PATH.write_text(
-        json.dumps(
-            {
-                "dataset_signature": dataset_signature,
-                "training_source": training_source,
-                "training_samples": int(labels_array.shape[0]),
-                "evaluation": evaluation,
-            },
-            indent=2,
-        ),
+        json.dumps(report_payload, indent=2),
         encoding="utf-8",
     )
+    _append_report_history(report_payload)
 
     return _RealModelBundle(
-        model=model,
-        metadata={
-            "source": training_source,
-            "samples": int(labels_array.shape[0]),
-            "dataset_path": dataset_path,
-        },
-        evaluation=evaluation,
+        probability_model=probability_model,
+        explanation_model=explanation_model,
+        report=report_payload,
     )
+
+
+def _build_calibrated_model(base_model, x_train, y_train, calibrator_cls):
+    try:
+        calibrator = calibrator_cls(estimator=base_model, method="sigmoid", cv=3)
+    except TypeError:  # pragma: no cover - sklearn API compatibility
+        calibrator = calibrator_cls(base_estimator=base_model, method="sigmoid", cv=3)
+
+    try:
+        calibrator.fit(x_train, y_train)
+        return calibrator, "sigmoid"
+    except Exception:
+        base_model.fit(x_train, y_train)
+        return base_model, "uncalibrated"
 
 
 @lru_cache(maxsize=1)
@@ -575,19 +698,29 @@ def _build_proxy_explanation(
                     "description": description,
                     "direction": "raises risk" if local_strength >= 0 else "lowers risk",
                     "strength": round(abs(local_strength), 4),
+                    "strength_pct": 0.0,
                 },
             )
         )
 
     scored_signals.sort(key=lambda item: item[0], reverse=True)
-    return [signal for _score, signal in scored_signals[:4]]
+    top = [signal for _score, signal in scored_signals[:4]]
+    max_strength = max((signal["strength"] for signal in top), default=0.0)
+
+    for signal in top:
+        strength = float(signal["strength"])
+        signal["strength_pct"] = (
+            0.0 if max_strength == 0 else round((strength / max_strength) * 100, 1)
+        )
+
+    return top
 
 
-def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
+def _build_shap_explanation(explanation_model, vector_array) -> list[dict[str, object]]:
     import numpy as np
     import shap
 
-    explainer = shap.TreeExplainer(model)
+    explainer = shap.TreeExplainer(explanation_model)
     shap_values = explainer.shap_values(vector_array.reshape(1, -1))
     contributions = _extract_positive_class_shap_values(shap_values)
     max_strength = max((abs(value) for value in contributions), default=0.0)
@@ -599,7 +732,7 @@ def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
     )
     signals: list[dict[str, object]] = []
 
-    for index, contribution in ranked[:4]:
+    for index, contribution in ranked[:5]:
         if float(vector_array[index]) <= 0:
             continue
 
@@ -632,9 +765,94 @@ def _extract_positive_class_shap_values(shap_values) -> list[float]:
     return values[0].tolist()
 
 
+def _build_global_feature_summary(model) -> list[dict[str, object]]:
+    feature_importances = getattr(model, "feature_importances_", None)
+    if feature_importances is None:
+        return []
+
+    max_strength = max((float(value) for value in feature_importances), default=0.0)
+    ranked = sorted(
+        enumerate(feature_importances),
+        key=lambda item: float(item[1]),
+        reverse=True,
+    )
+    summary: list[dict[str, object]] = []
+
+    for index, raw_strength in ranked[:6]:
+        name, label, description, _transform = _FEATURE_SPECS[index]
+        strength = float(raw_strength)
+        strength_pct = 0.0 if max_strength == 0 else (strength / max_strength) * 100
+        summary.append(
+            {
+                "feature": name,
+                "label": label,
+                "description": description,
+                "strength": round(strength, 4),
+                "strength_pct": round(strength_pct, 1),
+            }
+        )
+
+    return summary
+
+
+def _load_cached_report_if_current() -> dict[str, object] | None:
+    dataset_path = _resolve_dataset_path()
+    if not dataset_path.exists() or not _MODEL_REPORT_PATH.exists():
+        return None
+
+    try:
+        report = json.loads(_MODEL_REPORT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    if report.get("dataset_signature") != _dataset_signature(dataset_path):
+        return None
+    return report
+
+
+def _append_report_history(report_payload: dict[str, object]) -> None:
+    history = _read_report_history()
+    entry = {
+        "model_name": report_payload.get("model_name"),
+        "model_version": report_payload.get("model_version"),
+        "trained_at": report_payload.get("trained_at"),
+        "dataset_version": report_payload.get("dataset_version"),
+        "training_source": report_payload.get("training_source"),
+        "evaluation": report_payload.get("evaluation", {}),
+    }
+
+    if history and history[-1] == entry:
+        return
+
+    history.append(entry)
+    _MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    _MODEL_HISTORY_PATH.write_text(json.dumps(history[-10:], indent=2), encoding="utf-8")
+
+
+def _read_report_history() -> list[dict[str, object]]:
+    if not _MODEL_HISTORY_PATH.exists():
+        return []
+    try:
+        payload = json.loads(_MODEL_HISTORY_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
 def _classify_probability(probability: float) -> str:
-    if probability >= 0.7:
+    if probability >= _RISK_THRESHOLDS["phishing"]:
         return "phishing"
-    if probability >= 0.35:
+    if probability >= _RISK_THRESHOLDS["safe"]:
         return "suspicious"
     return "safe"
+
+
+def _confidence_label(probability: float) -> str:
+    distance = abs(probability - 0.5)
+    if distance >= 0.35:
+        return "high confidence"
+    if distance >= 0.2:
+        return "medium confidence"
+    return "low confidence"

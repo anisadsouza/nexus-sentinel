@@ -70,56 +70,12 @@ class AnalysisService:
         return results
 
     def list_similar_groups(self) -> list[dict[str, object]]:
-        grouped: dict[str, dict[str, object]] = {}
-
-        for record in self._records:
-            similar_group = grouped.setdefault(
-                record.similar_group_id,
-                {
-                    "similar_group_id": record.similar_group_id,
-                    "classification": record.classification,
-                    "size": 0,
-                    "example_urls": [],
-                    "common_risk_factors": [],
-                    "shared_traits": [],
-                    "grouping_reason": "",
-                    "first_seen": record.analyzed_at,
-                    "latest_seen": record.analyzed_at,
-                },
-            )
-            similar_group["size"] = int(similar_group["size"]) + 1
-            example_urls = similar_group["example_urls"]
-            if len(example_urls) < 3:
-                example_urls.append(record.url)
-            similar_group["first_seen"] = min(
-                str(similar_group["first_seen"]), record.analyzed_at
-            )
-            similar_group["latest_seen"] = max(
-                str(similar_group["latest_seen"]), record.analyzed_at
-            )
-
-        for similar_group in grouped.values():
-            group_records = [
-                record
-                for record in self._records
-                if record.similar_group_id == similar_group["similar_group_id"]
-            ]
-            factor_counts: dict[str, int] = {}
-            for record in group_records:
-                for factor in record.risk_factors:
-                    factor_counts[factor] = factor_counts.get(factor, 0) + 1
-            similar_group["common_risk_factors"] = [
-                factor
-                for factor, _count in sorted(
-                    factor_counts.items(),
-                    key=lambda item: (-item[1], item[0]),
-                )[:2]
-            ]
-            similar_group["shared_traits"] = _shared_traits(group_records)
-            similar_group["grouping_reason"] = _grouping_reason(similar_group)
-
+        groups = [
+            _build_similar_group_summary(records)
+            for _group_id, records in _group_records_by_id(self._records).items()
+        ]
         return sorted(
-            grouped.values(),
+            groups,
             key=lambda group: (-int(group["size"]), str(group["similar_group_id"])),
         )
 
@@ -235,6 +191,46 @@ def _bucket(value: int) -> str:
     if value <= 5:
         return "medium"
     return "high"
+
+
+def _group_records_by_id(
+    records: list[AnalysisRecord],
+) -> dict[str, list[AnalysisRecord]]:
+    grouped: dict[str, list[AnalysisRecord]] = {}
+    for record in records:
+        grouped.setdefault(record.similar_group_id, []).append(record)
+    return grouped
+
+
+def _build_similar_group_summary(
+    records: list[AnalysisRecord],
+) -> dict[str, object]:
+    first_record = records[0]
+    factor_counts: dict[str, int] = {}
+
+    for record in records:
+        for factor in record.risk_factors:
+            factor_counts[factor] = factor_counts.get(factor, 0) + 1
+
+    summary = {
+        "similar_group_id": first_record.similar_group_id,
+        "classification": first_record.classification,
+        "size": len(records),
+        "example_urls": [record.url for record in records[:3]],
+        "common_risk_factors": [
+            factor
+            for factor, _count in sorted(
+                factor_counts.items(),
+                key=lambda item: (-item[1], item[0]),
+            )[:2]
+        ],
+        "shared_traits": _shared_traits(records),
+        "grouping_reason": "",
+        "first_seen": min(record.analyzed_at for record in records),
+        "latest_seen": max(record.analyzed_at for record in records),
+    }
+    summary["grouping_reason"] = _grouping_reason(summary)
+    return summary
 
 
 def _shared_traits(records: list[AnalysisRecord]) -> list[str]:
