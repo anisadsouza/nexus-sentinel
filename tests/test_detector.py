@@ -19,6 +19,7 @@ class DetectorTests(unittest.TestCase):
         self.assertIn("prediction_probability", result.ml_analysis)
         self.assertIn("shap_status", result.ml_analysis)
         self.assertIn("feature_vector", result.ml_analysis)
+        self.assertIn("confidence_label", result.ml_analysis)
 
     def test_suspicious_url_accumulates_risk_factors(self) -> None:
         result = analyze_url(
@@ -58,13 +59,26 @@ class DetectorTests(unittest.TestCase):
                     "password_field_detected": True,
                     "urgency_language_detected": True,
                     "external_scripts_detected": True,
+                    "form_action_external_detected": True,
+                    "brand_impersonation_clues_detected": True,
+                    "brand_keywords_detected": ["paypal"],
+                    "iframe_detected": True,
+                    "form_count": 1,
                     "notes": "Fetched test page.",
                 },
                 {
                     "status": "fetched",
                     "redirect_count": 2,
+                    "redirect_chain": [
+                        "https://secure-check.top/login",
+                        "http://secure-check.top/final",
+                    ],
                     "final_url": "https://secure-check.top/login",
+                    "final_scheme": "http",
+                    "status_code": 200,
                     "cross_domain_redirect_detected": True,
+                    "cross_domain_hops": 1,
+                    "downgrade_to_http_detected": True,
                     "suspicious_redirect_chain": True,
                     "notes": "Fetched test redirect chain.",
                 },
@@ -80,6 +94,8 @@ class DetectorTests(unittest.TestCase):
         self.assertEqual(result.ml_analysis["status"], "available")
         self.assertIn("Page asks for a password", result.risk_factors)
         self.assertIn("Link uses a suspicious redirect chain", result.risk_factors)
+        self.assertIn("Login form sends data to another website", result.risk_factors)
+        self.assertIn("Link redirects from HTTPS to HTTP", result.risk_factors)
         self.assertTrue(
             any(item["rule"] == "password_field" for item in result.score_breakdown)
         )
