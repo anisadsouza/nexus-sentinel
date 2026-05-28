@@ -189,6 +189,27 @@ def _score_features(
     )
 
     add_rule(
+        bool(content_analysis.get("form_action_external_detected")),
+        8,
+        "form_action_external",
+        "Login form sends data to another website",
+    )
+
+    add_rule(
+        bool(content_analysis.get("brand_impersonation_clues_detected")),
+        6,
+        "brand_impersonation",
+        "Page mentions a brand that does not match the website name",
+    )
+
+    add_rule(
+        bool(content_analysis.get("iframe_detected")),
+        4,
+        "iframe_detected",
+        "Page uses an embedded frame",
+    )
+
+    add_rule(
         bool(redirect_analysis.get("cross_domain_redirect_detected")),
         10,
         "cross_domain_redirect",
@@ -200,6 +221,13 @@ def _score_features(
         12,
         "suspicious_redirect_chain",
         "Link uses a suspicious redirect chain",
+    )
+
+    add_rule(
+        bool(redirect_analysis.get("downgrade_to_http_detected")),
+        8,
+        "downgrade_to_http",
+        "Link redirects from HTTPS to HTTP",
     )
 
     return min(score, 100), factors, breakdown
@@ -237,6 +265,11 @@ def _build_content_analysis_placeholder() -> dict[str, object]:
         "password_field_detected": None,
         "urgency_language_detected": None,
         "external_scripts_detected": None,
+        "form_action_external_detected": None,
+        "brand_impersonation_clues_detected": None,
+        "brand_keywords_detected": [],
+        "iframe_detected": None,
+        "form_count": None,
         "notes": "Live webpage content analysis has not been enabled yet.",
     }
 
@@ -245,8 +278,13 @@ def _build_redirect_analysis_placeholder() -> dict[str, object]:
     return {
         "status": "not_fetched",
         "redirect_count": None,
+        "redirect_chain": [],
         "final_url": None,
+        "final_scheme": None,
+        "status_code": None,
         "cross_domain_redirect_detected": None,
+        "cross_domain_hops": None,
+        "downgrade_to_http_detected": None,
         "suspicious_redirect_chain": None,
         "notes": "Live redirect tracing has not been enabled yet.",
     }
@@ -323,6 +361,18 @@ def _rule_explanation(label: str) -> tuple[str, str]:
             "Outside scripts detected",
             "Loading code from other sites can be a sign of a hastily assembled or unsafe page.",
         ),
+        "form_action_external": (
+            "Form sends data elsewhere",
+            "A login form that sends your data to another site can be a sign of credential theft.",
+        ),
+        "brand_impersonation": (
+            "Brand wording mismatch",
+            "If the page mentions a known brand but the website name does not match, it may be impersonating that brand.",
+        ),
+        "iframe_detected": (
+            "Embedded frame detected",
+            "Embedded frames can be used to hide content from another site inside a suspicious page.",
+        ),
         "cross_domain_redirect": (
             "Redirect to another site",
             "A link that bounces you to a different site can hide the real destination until after you click.",
@@ -330,6 +380,10 @@ def _rule_explanation(label: str) -> tuple[str, str]:
         "suspicious_redirect_chain": (
             "Suspicious redirect chain",
             "Multiple redirects are often used to hide where a link ends up and bypass simple checks.",
+        ),
+        "downgrade_to_http": (
+            "Redirect downgrades security",
+            "A redirect from HTTPS to HTTP drops transport protection and is unusual for a trustworthy service.",
         ),
     }
     return explanations.get(
