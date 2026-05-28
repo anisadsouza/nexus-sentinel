@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from wsgiref.simple_server import make_server
 
 from nexus_sentinel.live_checks import run_live_checks
+from nexus_sentinel.ml import get_model_report
 from nexus_sentinel.service import AnalysisService
 
 
@@ -59,6 +60,12 @@ class DashboardApp:
                     "similar_groups": self._service.list_similar_groups(),
                     "overview": self._service.overview(),
                 },
+            )
+        if path == "/api/model-report":
+            return self._json_response(
+                start_response,
+                200,
+                {"model_report": get_model_report()},
             )
         return self._json_response(start_response, 404, {"error": "Not found"})
 

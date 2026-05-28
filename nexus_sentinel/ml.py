@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+import json
 import math
+import os
 from pathlib import Path
 import random
 
@@ -140,6 +142,12 @@ _FEATURE_SPECS = (
     ),
 )
 
+_DEFAULT_DATASET_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "data"
+    / "training"
+    / "esdaung_phishdataset_balanced_20000.xlsx"
+)
 _TRAINING_WEIGHTS = (
     0.55,
     1.25,
@@ -158,13 +166,9 @@ _TRAINING_WEIGHTS = (
     0.85,
     0.95,
 )
-
-_DATASET_PATH = (
-    Path(__file__).resolve().parent.parent
-    / "data"
-    / "training"
-    / "esdaung_phishdataset_balanced_20000.xlsx"
-)
+_MODEL_DIR = Path(__file__).resolve().parent.parent / "data" / "models"
+_MODEL_ARTIFACT_PATH = _MODEL_DIR / "random_forest_url_model.joblib"
+_MODEL_REPORT_PATH = _MODEL_DIR / "random_forest_url_model_report.json"
 
 
 @dataclass(frozen=True)
@@ -196,6 +200,13 @@ class _NaiveBayesModel:
         return 1.0 / (1.0 + math.exp(-margin))
 
 
+@dataclass(frozen=True)
+class _RealModelBundle:
+    model: object
+    metadata: dict[str, object]
+    evaluation: dict[str, object]
+
+
 def build_ml_analysis(
     extracted_features: dict[str, object],
     content_analysis: dict[str, object],
@@ -223,7 +234,29 @@ def build_feature_vector_row(
     vector = _feature_vector(extracted_features, content_analysis, redirect_analysis)
     return {
         name: round(value, 4)
-        for (name, _label, _description, _transform), value in zip(_FEATURE_SPECS, vector)
+        for (name, _label, _description, _transform), value in zip(
+            _FEATURE_SPECS, vector
+        )
+    }
+
+
+def get_model_report() -> dict[str, object]:
+    bundle = _get_real_model_bundle()
+    if bundle is not None:
+        return {
+            "status": "available",
+            "training_source": bundle.metadata["source"],
+            "training_samples": bundle.metadata["samples"],
+            "evaluation": bundle.evaluation,
+            "dataset_path": str(bundle.metadata["dataset_path"]),
+        }
+
+    return {
+        "status": "fallback",
+        "training_source": "synthetic fallback",
+        "training_samples": 850,
+        "evaluation": {},
+        "dataset_path": str(_resolve_dataset_path()),
     }
 
 
@@ -233,7 +266,6 @@ def _build_real_ml_analysis(
 ) -> dict[str, object] | None:
     try:
         import numpy as np
-        import shap
     except Exception:
         return None
 
@@ -241,11 +273,10 @@ def _build_real_ml_analysis(
     if bundle is None:
         return None
 
-    model, dataset_metadata = bundle
     vector_array = np.asarray(vector, dtype=float)
-    probability = float(model.predict_proba(vector_array.reshape(1, -1))[0][1])
+    probability = float(bundle.model.predict_proba(vector_array.reshape(1, -1))[0][1])
     predicted_classification = _classify_probability(probability)
-    top_signals = _build_shap_explanation(model, vector_array)
+    top_signals = _build_shap_explanation(bundle.model, vector_array)
 
     return {
         "status": "available",
@@ -256,8 +287,9 @@ def _build_real_ml_analysis(
         "shap_status": "available",
         "feature_vector": feature_vector,
         "top_signals": top_signals,
-        "training_source": dataset_metadata["source"],
-        "training_samples": dataset_metadata["samples"],
+        "training_source": bundle.metadata["source"],
+        "training_samples": bundle.metadata["samples"],
+        "evaluation": bundle.evaluation,
         "notes": "A local Random Forest model is active and this result uses true SHAP feature contributions from a real labeled phishing URL dataset.",
     }
 
@@ -281,6 +313,7 @@ def _build_fallback_ml_analysis(
         "top_signals": _build_proxy_explanation(model, vector),
         "training_source": "synthetic fallback",
         "training_samples": 850,
+        "evaluation": {},
         "notes": "A lightweight local model is active. SHAP or the real dataset-backed stack is not available in this interpreter, so the explanation below uses a simpler feature-gap proxy.",
     }
 
@@ -297,19 +330,48 @@ def _feature_vector(
 
 
 @lru_cache(maxsize=1)
-def _get_real_model_bundle():
+def _get_real_model_bundle() -> _RealModelBundle | None:
     try:
+        import joblib
         import numpy as np
         import pandas as pd
         from sklearn.ensemble import RandomForestClassifier
+        from sklearn.metrics import (
+            accuracy_score,
+            confusion_matrix,
+            f1_score,
+            precision_score,
+            recall_score,
+        )
+        from sklearn.model_selection import train_test_split
     except Exception:
         return None
 
-    if not _DATASET_PATH.exists():
+    dataset_path = _resolve_dataset_path()
+    if not dataset_path.exists():
         return None
 
-    frame = pd.read_excel(_DATASET_PATH)
-    if "URLs" not in frame.columns or "Labels" not in frame.columns:
+    dataset_signature = _dataset_signature(dataset_path)
+
+    if _MODEL_ARTIFACT_PATH.exists() and _MODEL_REPORT_PATH.exists():
+      try:
+        report_payload = json.loads(_MODEL_REPORT_PATH.read_text(encoding="utf-8"))
+        if report_payload.get("dataset_signature") == dataset_signature:
+            model = joblib.load(_MODEL_ARTIFACT_PATH)
+            return _RealModelBundle(
+                model=model,
+                metadata={
+                    "source": str(report_payload.get("training_source", "Real URL dataset")),
+                    "samples": int(report_payload.get("training_samples", 0)),
+                    "dataset_path": dataset_path,
+                },
+                evaluation=dict(report_payload.get("evaluation", {})),
+            )
+      except Exception:
+        pass
+
+    frame = _read_dataset_frame(dataset_path, pd)
+    if frame is None or "URLs" not in frame.columns or "Labels" not in frame.columns:
         return None
 
     training_vectors: list[tuple[float, ...]] = []
@@ -317,10 +379,10 @@ def _get_real_model_bundle():
 
     for row in frame.itertuples(index=False):
         url = str(getattr(row, "URLs", "") or "").strip()
-        label = int(getattr(row, "Labels", 0))
         if not url:
             continue
 
+        label = int(getattr(row, "Labels", 0))
         features = extract_url_features(url)
         serialized = {
             "url_length": features.url_length,
@@ -356,17 +418,64 @@ def _get_real_model_bundle():
 
     training_array = np.asarray(training_vectors, dtype=float)
     labels_array = np.asarray(labels, dtype=int)
+    x_train, x_test, y_train, y_test = train_test_split(
+        training_array,
+        labels_array,
+        test_size=0.2,
+        random_state=42,
+        stratify=labels_array,
+    )
 
     model = RandomForestClassifier(
-        n_estimators=120,
-        max_depth=6,
+        n_estimators=200,
+        max_depth=10,
+        min_samples_leaf=2,
         random_state=42,
+        n_jobs=-1,
     )
-    model.fit(training_array, labels_array)
-    return model, {
-        "source": "ESDAUNG PhishDataset balanced set",
-        "samples": int(labels_array.shape[0]),
+    model.fit(x_train, y_train)
+
+    predictions = model.predict(x_test)
+    evaluation = {
+        "accuracy": round(float(accuracy_score(y_test, predictions)), 4),
+        "precision": round(float(precision_score(y_test, predictions)), 4),
+        "recall": round(float(recall_score(y_test, predictions)), 4),
+        "f1_score": round(float(f1_score(y_test, predictions)), 4),
+        "confusion_matrix": confusion_matrix(y_test, predictions).tolist(),
+        "train_samples": int(x_train.shape[0]),
+        "test_samples": int(x_test.shape[0]),
     }
+
+    training_source = (
+        "ESDAUNG PhishDataset balanced set"
+        if dataset_path == _DEFAULT_DATASET_PATH
+        else dataset_path.stem
+    )
+
+    _MODEL_DIR.mkdir(parents=True, exist_ok=True)
+    joblib.dump(model, _MODEL_ARTIFACT_PATH)
+    _MODEL_REPORT_PATH.write_text(
+        json.dumps(
+            {
+                "dataset_signature": dataset_signature,
+                "training_source": training_source,
+                "training_samples": int(labels_array.shape[0]),
+                "evaluation": evaluation,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    return _RealModelBundle(
+        model=model,
+        metadata={
+            "source": training_source,
+            "samples": int(labels_array.shape[0]),
+            "dataset_path": dataset_path,
+        },
+        evaluation=evaluation,
+    )
 
 
 @lru_cache(maxsize=1)
@@ -395,6 +504,31 @@ def _get_fallback_model() -> _NaiveBayesModel:
         safe_prior=len(safe_rows) / float(len(safe_rows) + len(risky_rows)),
         risky_prior=len(risky_rows) / float(len(safe_rows) + len(risky_rows)),
     )
+
+
+def _resolve_dataset_path() -> Path:
+    env_path = os.environ.get("NEXUS_SENTINEL_DATASET_PATH", "").strip()
+    if env_path:
+        return Path(env_path).expanduser()
+    return _DEFAULT_DATASET_PATH
+
+
+def _read_dataset_frame(dataset_path: Path, pandas_module):
+    suffix = dataset_path.suffix.lower()
+    if suffix in {".xlsx", ".xls"}:
+        return pandas_module.read_excel(dataset_path)
+    if suffix == ".csv":
+        return pandas_module.read_csv(dataset_path)
+    return None
+
+
+def _dataset_signature(dataset_path: Path) -> dict[str, object]:
+    stat = dataset_path.stat()
+    return {
+        "path": str(dataset_path.resolve()),
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
 
 
 def _column_stats(
@@ -456,6 +590,7 @@ def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
     explainer = shap.TreeExplainer(model)
     shap_values = explainer.shap_values(vector_array.reshape(1, -1))
     contributions = _extract_positive_class_shap_values(shap_values)
+    max_strength = max((abs(value) for value in contributions), default=0.0)
 
     ranked = sorted(
         enumerate(contributions),
@@ -469,13 +604,16 @@ def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
             continue
 
         name, label, description, _transform = _FEATURE_SPECS[index]
+        strength = abs(float(contribution))
+        normalized_strength = 0.0 if max_strength == 0 else strength / max_strength
         signals.append(
             {
                 "feature": name,
                 "label": label,
                 "description": description,
                 "direction": "raises risk" if contribution >= 0 else "lowers risk",
-                "strength": round(abs(float(contribution)), 4),
+                "strength": round(strength, 4),
+                "strength_pct": round(normalized_strength * 100, 1),
             }
         )
 
@@ -483,10 +621,7 @@ def _build_shap_explanation(model, vector_array) -> list[dict[str, object]]:
 
 
 def _extract_positive_class_shap_values(shap_values) -> list[float]:
-    try:
-        import numpy as np
-    except Exception:
-        return []
+    import numpy as np
 
     if isinstance(shap_values, list):
         return np.asarray(shap_values[-1][0], dtype=float).tolist()
