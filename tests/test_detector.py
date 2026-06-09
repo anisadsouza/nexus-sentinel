@@ -63,6 +63,9 @@ class DetectorTests(unittest.TestCase):
                     "brand_impersonation_clues_detected": True,
                     "brand_keywords_detected": ["paypal"],
                     "iframe_detected": True,
+                    "hidden_input_count": 6,
+                    "meta_refresh_detected": True,
+                    "external_link_count": 4,
                     "form_count": 1,
                     "notes": "Fetched test page.",
                 },
@@ -96,6 +99,8 @@ class DetectorTests(unittest.TestCase):
         self.assertIn("Link uses a suspicious redirect chain", result.risk_factors)
         self.assertIn("Login form sends data to another website", result.risk_factors)
         self.assertIn("Link redirects from HTTPS to HTTP", result.risk_factors)
+        self.assertIn("Page uses a meta refresh redirect", result.risk_factors)
+        self.assertIn("Page contains many hidden form fields", result.risk_factors)
         self.assertTrue(
             any(item["rule"] == "password_field" for item in result.score_breakdown)
         )
