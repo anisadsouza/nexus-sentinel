@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
+import hashlib
 import json
 import math
 import os
@@ -173,6 +174,7 @@ _MODEL_REPORT_PATH = _MODEL_DIR / "best_url_risk_model_report.json"
 _MODEL_HISTORY_PATH = _MODEL_DIR / "best_url_risk_model_history.json"
 _MODEL_VERSION = "2026.05"
 _RISK_THRESHOLDS = {"safe": 0.35, "phishing": 0.70}
+_SUPPORTED_DATASET_SUFFIXES = {".xlsx", ".xls", ".csv"}
 
 
 @dataclass(frozen=True)
@@ -250,6 +252,7 @@ def get_model_report() -> dict[str, object]:
         report = dict(cached_report)
         report["status"] = "available"
         report["dataset_path"] = str(_resolve_dataset_path())
+        report["dataset_paths"] = [str(path) for path in _resolve_dataset_paths()]
         report["history"] = _read_report_history()
         report["history_count"] = len(report["history"])
         return report
@@ -262,7 +265,10 @@ def get_model_report() -> dict[str, object]:
         "training_samples": 850,
         "trained_at": None,
         "dataset_path": str(_resolve_dataset_path()),
+        "dataset_paths": [str(path) for path in _resolve_dataset_paths()],
         "dataset_version": "synthetic-fallback",
+        "dataset_count": len(_resolve_dataset_paths()),
+        "dataset_names": [path.stem for path in _resolve_dataset_paths()],
         "calibration_method": "none",
         "candidate_models": [],
         "decision_thresholds": dict(_RISK_THRESHOLDS),
@@ -290,7 +296,10 @@ def _build_real_ml_analysis(
     probability = float(
         bundle.probability_model.predict_proba(vector_array.reshape(1, -1))[0][1]
     )
-    predicted_classification = _classify_probability(probability)
+    predicted_classification = _classify_probability(
+        probability,
+        bundle.report.get("decision_thresholds", _RISK_THRESHOLDS),
+    )
     top_signals = _build_shap_explanation(bundle.explanation_model, vector_array)
     report = bundle.report
 
@@ -324,7 +333,7 @@ def _build_fallback_ml_analysis(
 ) -> dict[str, object]:
     model = _get_fallback_model()
     probability = model.predict_probability(vector)
-    predicted_classification = _classify_probability(probability)
+    predicted_classification = _classify_probability(probability, _RISK_THRESHOLDS)
 
     return {
         "status": "available",
@@ -376,20 +385,22 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         )
         from sklearn.metrics import (
             accuracy_score,
+            average_precision_score,
             confusion_matrix,
             f1_score,
             precision_score,
             recall_score,
+            roc_auc_score,
         )
         from sklearn.model_selection import train_test_split
     except Exception:
         return None
 
-    dataset_path = _resolve_dataset_path()
-    if not dataset_path.exists():
+    dataset_paths = _resolve_dataset_paths()
+    if not dataset_paths:
         return None
 
-    dataset_signature = _dataset_signature(dataset_path)
+    dataset_signature = _dataset_signature(dataset_paths)
     cached_report = _load_cached_report_if_current()
 
     if _MODEL_ARTIFACT_PATH.exists() and cached_report is not None:
@@ -407,7 +418,7 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         except Exception:
             pass
 
-    frame = _read_dataset_frame(dataset_path, pd)
+    frame = _read_dataset_frames(dataset_paths, pd)
     if frame is None or "URLs" not in frame.columns or "Labels" not in frame.columns:
         return None
 
@@ -515,7 +526,8 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
     )
 
     test_probabilities = probability_model.predict_proba(x_test)[:, 1]
-    predictions = (test_probabilities >= _RISK_THRESHOLDS["phishing"]).astype(int)
+    tuned_thresholds = _tune_thresholds(y_test, test_probabilities)
+    predictions = (test_probabilities >= tuned_thresholds["phishing"]).astype(int)
     matrix = confusion_matrix(y_test, predictions)
     false_positives = int(matrix[0][1]) if matrix.shape == (2, 2) else 0
     false_negatives = int(matrix[1][0]) if matrix.shape == (2, 2) else 0
@@ -525,6 +537,11 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         "precision": round(float(precision_score(y_test, predictions)), 4),
         "recall": round(float(recall_score(y_test, predictions)), 4),
         "f1_score": round(float(f1_score(y_test, predictions)), 4),
+        "roc_auc": round(float(roc_auc_score(y_test, test_probabilities)), 4),
+        "average_precision": round(
+            float(average_precision_score(y_test, test_probabilities)),
+            4,
+        ),
         "confusion_matrix": matrix.tolist(),
         "train_samples": int(x_train.shape[0]),
         "test_samples": int(x_test.shape[0]),
@@ -532,11 +549,7 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         "false_negatives": false_negatives,
     }
 
-    training_source = (
-        "ESDAUNG PhishDataset balanced set"
-        if dataset_path == _DEFAULT_DATASET_PATH
-        else dataset_path.stem
-    )
+    training_source = _build_training_source_label(dataset_paths)
     trained_at = datetime.now(timezone.utc).isoformat()
     candidate_models = [
         {
@@ -557,10 +570,12 @@ def _get_real_model_bundle() -> _RealModelBundle | None:
         "training_source": training_source,
         "training_samples": int(labels_array.shape[0]),
         "trained_at": trained_at,
-        "dataset_version": dataset_signature["mtime_ns"],
+        "dataset_version": dataset_signature["signature_hash"],
+        "dataset_count": len(dataset_paths),
+        "dataset_names": [path.stem for path in dataset_paths],
         "calibration_method": calibration_method,
         "candidate_models": candidate_models,
-        "decision_thresholds": dict(_RISK_THRESHOLDS),
+        "decision_thresholds": tuned_thresholds,
         "global_top_features": global_top_features,
         "evaluation": evaluation,
         "quick_eval_winner": quick_eval,
@@ -630,10 +645,29 @@ def _get_fallback_model() -> _NaiveBayesModel:
 
 
 def _resolve_dataset_path() -> Path:
+    return _resolve_dataset_paths()[0] if _resolve_dataset_paths() else _DEFAULT_DATASET_PATH
+
+
+def _resolve_dataset_paths() -> list[Path]:
     env_path = os.environ.get("NEXUS_SENTINEL_DATASET_PATH", "").strip()
     if env_path:
-        return Path(env_path).expanduser()
-    return _DEFAULT_DATASET_PATH
+        candidates = [Path(part).expanduser() for part in env_path.split(os.pathsep) if part.strip()]
+    else:
+        candidates = [_DEFAULT_DATASET_PATH]
+
+    resolved: list[Path] = []
+    for candidate in candidates:
+        if candidate.is_dir():
+            resolved.extend(
+                sorted(
+                    path
+                    for path in candidate.iterdir()
+                    if path.suffix.lower() in _SUPPORTED_DATASET_SUFFIXES
+                )
+            )
+        else:
+            resolved.append(candidate)
+    return [path for path in resolved if path.exists()]
 
 
 def _read_dataset_frame(dataset_path: Path, pandas_module):
@@ -645,12 +679,39 @@ def _read_dataset_frame(dataset_path: Path, pandas_module):
     return None
 
 
-def _dataset_signature(dataset_path: Path) -> dict[str, object]:
-    stat = dataset_path.stat()
+def _read_dataset_frames(dataset_paths: list[Path], pandas_module):
+    frames = []
+    for dataset_path in dataset_paths:
+        frame = _read_dataset_frame(dataset_path, pandas_module)
+        if frame is not None:
+            frames.append(frame)
+    if not frames:
+        return None
+    if len(frames) == 1:
+        return frames[0]
+    return pandas_module.concat(frames, ignore_index=True)
+
+
+def _dataset_signature(dataset_paths: list[Path] | Path) -> dict[str, object]:
+    paths = dataset_paths if isinstance(dataset_paths, list) else [dataset_paths]
+    members = []
+
+    for dataset_path in paths:
+        stat = dataset_path.stat()
+        members.append(
+            {
+                "path": str(dataset_path.resolve()),
+                "size": stat.st_size,
+                "mtime_ns": stat.st_mtime_ns,
+            }
+        )
+
+    signature_hash = hashlib.sha256(
+        json.dumps(members, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:16]
     return {
-        "path": str(dataset_path.resolve()),
-        "size": stat.st_size,
-        "mtime_ns": stat.st_mtime_ns,
+        "members": members,
+        "signature_hash": signature_hash,
     }
 
 
@@ -796,8 +857,8 @@ def _build_global_feature_summary(model) -> list[dict[str, object]]:
 
 
 def _load_cached_report_if_current() -> dict[str, object] | None:
-    dataset_path = _resolve_dataset_path()
-    if not dataset_path.exists() or not _MODEL_REPORT_PATH.exists():
+    dataset_paths = _resolve_dataset_paths()
+    if not dataset_paths or not _MODEL_REPORT_PATH.exists():
         return None
 
     try:
@@ -805,9 +866,51 @@ def _load_cached_report_if_current() -> dict[str, object] | None:
     except (OSError, json.JSONDecodeError):
         return None
 
-    if report.get("dataset_signature") != _dataset_signature(dataset_path):
+    if report.get("dataset_signature") != _dataset_signature(dataset_paths):
         return None
     return report
+
+
+def _build_training_source_label(dataset_paths: list[Path]) -> str:
+    if len(dataset_paths) == 1:
+        dataset_path = dataset_paths[0]
+        if dataset_path == _DEFAULT_DATASET_PATH:
+            return "ESDAUNG PhishDataset balanced set"
+        return dataset_path.stem
+
+    return f"Combined local URL datasets ({len(dataset_paths)})"
+
+
+def _tune_thresholds(y_test, probabilities) -> dict[str, float]:
+    best_threshold = _RISK_THRESHOLDS["phishing"]
+    best_f1 = -1.0
+
+    for step in range(45, 91):
+        candidate = step / 100.0
+        tp = fp = fn = 0
+        for label, probability in zip(y_test, probabilities):
+            predicted = 1 if probability >= candidate else 0
+            if predicted == 1 and label == 1:
+                tp += 1
+            elif predicted == 1 and label == 0:
+                fp += 1
+            elif predicted == 0 and label == 1:
+                fn += 1
+
+        precision = tp / (tp + fp) if (tp + fp) else 0.0
+        recall = tp / (tp + fn) if (tp + fn) else 0.0
+        f1 = (
+            2.0 * precision * recall / (precision + recall)
+            if (precision + recall)
+            else 0.0
+        )
+
+        if f1 > best_f1:
+            best_f1 = f1
+            best_threshold = candidate
+
+    safe_threshold = max(0.2, min(0.45, round(best_threshold * 0.5, 2)))
+    return {"safe": safe_threshold, "phishing": round(best_threshold, 2)}
 
 
 def _append_report_history(report_payload: dict[str, object]) -> None:
@@ -841,10 +944,14 @@ def _read_report_history() -> list[dict[str, object]]:
     return [item for item in payload if isinstance(item, dict)]
 
 
-def _classify_probability(probability: float) -> str:
-    if probability >= _RISK_THRESHOLDS["phishing"]:
+def _classify_probability(
+    probability: float,
+    thresholds: dict[str, float] | None = None,
+) -> str:
+    thresholds = thresholds or _RISK_THRESHOLDS
+    if probability >= float(thresholds["phishing"]):
         return "phishing"
-    if probability >= _RISK_THRESHOLDS["safe"]:
+    if probability >= float(thresholds["safe"]):
         return "suspicious"
     return "safe"
 
