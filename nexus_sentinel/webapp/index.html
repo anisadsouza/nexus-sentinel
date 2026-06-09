@@ -27,7 +27,7 @@
 
     <main class="layout">
       <section class="hero">
-        <p class="eyebrow">Private local phishing analysis</p>
+        <p class="eyebrow">Phishing link analysis</p>
         <h1>Check one link, a whole CSV, or a few safe examples.</h1>
         <p class="lede">
           Nexus Sentinel keeps the experience simple: analyze a URL, review the risk just below it, or switch to batch mode when you have a list.
@@ -82,7 +82,7 @@
             </button>
           </div>
           <p class="helper-copy">
-            Scans from this dashboard stay private by default.
+            Single-link scans stay private by default in this build.
           </p>
         </form>
 
@@ -112,7 +112,13 @@
             <button id="batch-analyze-button" type="button" class="secondary">
               Analyze CSV
             </button>
+            <button id="batch-sample-button" type="button" class="secondary batch-sample-button">
+              Use sample CSV
+            </button>
           </div>
+          <p class="helper-copy">
+            Upload up to 100 links. Exported results include the verdict, score, and top reason for each row.
+          </p>
           <p id="batch-message" class="form-message muted"></p>
         </section>
 

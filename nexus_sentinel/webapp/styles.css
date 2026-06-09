@@ -763,7 +763,21 @@ button:disabled {
   margin-bottom: 14px;
 }
 
+.batch-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
 .batch-summary-card {
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.batch-insight-card {
   padding: 14px 16px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -774,6 +788,13 @@ button:disabled {
   margin-bottom: 0;
   font-size: 26px;
   font-weight: 700;
+}
+
+.batch-insight-value {
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .batch-toolbar {
@@ -798,6 +819,10 @@ button:disabled {
   color: var(--text);
   padding: 8px 10px;
   font-size: 14px;
+}
+
+.batch-sample-button {
+  white-space: nowrap;
 }
 
 .batch-table {
@@ -826,6 +851,50 @@ button:disabled {
   gap: 12px;
 }
 
+.agreement-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.agreement-positive {
+  background: var(--green-soft);
+}
+
+.agreement-warning {
+  background: var(--amber-soft);
+}
+
+.agreement-title {
+  margin-bottom: 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.agreement-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ml-signal-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ml-signal-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
 .ml-comparison-grid,
 .batch-detail-grid,
 .ml-evaluation-grid {
@@ -838,7 +907,7 @@ button:disabled {
 }
 
 .ml-evaluation-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .ml-probability {
@@ -879,6 +948,11 @@ button:disabled {
   margin-bottom: 12px;
 }
 
+.batch-empty-state {
+  padding: 16px 10px;
+  text-align: center;
+}
+
 .batch-signal-list {
   display: grid;
   gap: 10px;
@@ -898,11 +972,24 @@ button:disabled {
   border-radius: 999px;
   background: var(--border);
   overflow: hidden;
+  position: relative;
+}
+
+.signal-meter-split .signal-meter-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: color-mix(in srgb, var(--text) 18%, transparent);
+  transform: translateX(-50%);
 }
 
 .signal-meter-fill {
   height: 100%;
   border-radius: 999px;
+  position: absolute;
+  top: 0;
 }
 
 .signal-meter-risk {
@@ -911,6 +998,14 @@ button:disabled {
 
 .signal-meter-safe {
   background: var(--green-text);
+}
+
+.signal-meter-right .signal-meter-fill {
+  left: 50%;
+}
+
+.signal-meter-left .signal-meter-fill {
+  right: 50%;
 }
 
 .signal-meter-neutral {
@@ -948,6 +1043,25 @@ button:disabled {
 
 .model-candidate-list {
   margin-top: 14px;
+}
+
+.benchmark-history {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.dataset-name-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
 }
 
 .model-report-actions {
@@ -1008,12 +1122,23 @@ button:disabled {
 
   .ml-comparison-grid,
   .batch-detail-grid,
-  .ml-evaluation-grid {
+  .ml-evaluation-grid,
+  .ml-signal-sections {
     grid-template-columns: 1fr;
   }
 
   .batch-summary-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .batch-insights-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .batch-upload-actions,
+  .batch-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .model-report-header {
@@ -1049,6 +1174,7 @@ button:disabled {
   }
 
   .batch-summary-cards,
+  .batch-insights-grid,
   .confusion-matrix {
     grid-template-columns: 1fr;
   }
