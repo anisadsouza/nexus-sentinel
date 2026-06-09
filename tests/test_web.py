@@ -152,6 +152,8 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("model_report", payload)
         self.assertIn("status", payload["model_report"])
         self.assertIn("training_source", payload["model_report"])
+        self.assertIn("dataset_paths", payload["model_report"])
+        self.assertIn("decision_thresholds", payload["model_report"])
 
     def test_model_report_download_endpoint_returns_attachment(self) -> None:
         app = DashboardApp()
