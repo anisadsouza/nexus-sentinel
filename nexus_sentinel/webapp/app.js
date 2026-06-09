@@ -5,6 +5,7 @@ const formMessage = document.getElementById("form-message");
 const analyzeButton = document.getElementById("analyze-button");
 const batchFileInput = document.getElementById("batch-file");
 const batchAnalyzeButton = document.getElementById("batch-analyze-button");
+const batchSampleButton = document.getElementById("batch-sample-button");
 const batchMessage = document.getElementById("batch-message");
 const batchResults = document.getElementById("batch-results");
 const modelReportPanel = document.getElementById("model-report-panel");
@@ -15,6 +16,7 @@ const workspaceTabs = Array.from(document.querySelectorAll(".workspace-tab"));
 const workspacePanels = Array.from(document.querySelectorAll(".workspace-panel"));
 const THEME_STORAGE_KEY = "nexus-sentinel-theme";
 let currentBatchData = null;
+let currentSingleResult = null;
 let batchFilterValue = "all";
 let batchSortValue = "score_desc";
 
@@ -139,6 +141,24 @@ batchAnalyzeButton.addEventListener("click", async () => {
   }
 });
 
+batchSampleButton.addEventListener("click", () => {
+  const sampleCsv = [
+    "url",
+    "https://example.com",
+    "http://192.168.1.5/login",
+    "https://pay-update-secure-login.top/a/b/c/d/%2Freset?next=home",
+  ].join("\n");
+  const sampleBlob = new Blob([sampleCsv], { type: "text/csv" });
+  const sampleFile = new File([sampleBlob], "nexus-sentinel-sample.csv", {
+    type: "text/csv",
+  });
+  const transfer = new DataTransfer();
+  transfer.items.add(sampleFile);
+  batchFileInput.files = transfer.files;
+  batchMessage.textContent = "Sample CSV loaded. You can analyze it right away.";
+  batchMessage.className = "form-message muted";
+});
+
 function setActivePanel(panelId) {
   workspaceTabs.forEach((tab) => {
     const isActive = tab.dataset.panelTarget === panelId;
@@ -153,6 +173,7 @@ function setActivePanel(panelId) {
 }
 
 function renderResult(data) {
+  currentSingleResult = data;
   const scoreBreakdown = Array.isArray(data.score_breakdown) ? data.score_breakdown : [];
   const features = data.extracted_features || {};
   const contentAnalysis = data.content_analysis || {};
@@ -241,7 +262,7 @@ function renderResult(data) {
       <section class="result-card">
         <p class="section-kicker">Model check</p>
         <div class="ml-summary">
-          ${buildMlSummary(mlAnalysis)}
+          ${buildMlSummary(mlAnalysis, data.classification, data.risk_score)}
         </div>
       </section>
     </div>
@@ -252,7 +273,16 @@ function renderResult(data) {
         <div class="info-list">${buildTips(data, features)}</div>
       </section>
     </div>
+
+    <div class="result-actions">
+      <button id="download-single-report" type="button" class="secondary">Download result JSON</button>
+    </div>
   `;
+
+  const downloadButton = document.getElementById("download-single-report");
+  if (downloadButton) {
+    downloadButton.addEventListener("click", downloadSingleResult);
+  }
 }
 
 function renderBatchResults(data) {
@@ -277,12 +307,16 @@ function renderBatchWorkspace() {
 
   const summary = currentBatchData.summary || {};
   const results = getFilteredBatchResults();
+  const visibleCount = results.length;
+  const totalCount = currentBatchData.results.length;
+  const filterLabel = humanBatchFilter(batchFilterValue);
 
   batchResults.innerHTML = `
     <div class="batch-results-header">
       <div>
         <p class="section-kicker">Batch Results</p>
         <h2>CSV analysis results</h2>
+        <p class="panel-copy">Showing ${visibleCount} of ${totalCount} result${totalCount === 1 ? "" : "s"}${batchFilterValue === "all" ? "" : ` for ${filterLabel.toLowerCase()}`}. </p>
       </div>
       <div class="meta-strip">
         <span class="meta-pill">${summary.total_urls || currentBatchData.results.length} scanned</span>
@@ -293,6 +327,9 @@ function renderBatchWorkspace() {
     </div>
     <div class="batch-summary-cards">
       ${buildBatchSummaryCards(summary)}
+    </div>
+    <div class="batch-insights-grid">
+      ${buildBatchInsights(results)}
     </div>
     <div class="batch-toolbar">
       <label class="batch-control">
@@ -322,12 +359,12 @@ function renderBatchWorkspace() {
             <th>URL</th>
             <th>Result</th>
             <th>Score</th>
-            <th>Model Risk</th>
-            <th>Similar Links</th>
+            <th>Model View</th>
+            <th>Pattern Matches</th>
           </tr>
         </thead>
         <tbody>
-          ${results
+          ${results.length ? results
             .map(
               (item) => `
                 <tr class="batch-row-main">
@@ -360,7 +397,16 @@ function renderBatchWorkspace() {
                 </tr>
               `
             )
-            .join("")}
+            .join("") : `
+              <tr>
+                <td colspan="5">
+                  <div class="batch-empty-state">
+                    <p class="factor-title">No rows match this filter</p>
+                    <p class="factor-impact">Try another result filter or sort option to bring rows back into view.</p>
+                  </div>
+                </td>
+              </tr>
+            `}
         </tbody>
       </table>
     </div>
@@ -491,7 +537,7 @@ function buildRiskRows(scoreBreakdown) {
     .join("");
 }
 
-function buildMlSummary(mlAnalysis) {
+function buildMlSummary(mlAnalysis, ruleClassification, ruleRiskScore) {
   if (mlAnalysis.status !== "available") {
     return `
       <p class="factor-impact">${mlAnalysis.notes || "The model explanation is unavailable right now."}</p>
@@ -499,32 +545,8 @@ function buildMlSummary(mlAnalysis) {
   }
 
   const signals = Array.isArray(mlAnalysis.top_signals) ? mlAnalysis.top_signals : [];
-  const signalMarkup = signals.length
-    ? signals
-        .map(
-          (signal) => `
-            <div class="factor-row">
-              <span class="factor-icon ${signal.direction === "raises risk" ? "factor-warn" : "factor-good"}">
-                ${signal.direction === "raises risk" ? "!" : "✓"}
-              </span>
-              <div class="factor-copy">
-                <div class="factor-title-row">
-                  <p class="factor-title">${signal.label}</p>
-                  <span class="tooltip-wrap" tabindex="0">
-                    <span class="tooltip-trigger" aria-label="Why this matters">?</span>
-                    <span class="tooltip-bubble">
-                      ${signal.description}
-                    </span>
-                  </span>
-                </div>
-                <p class="factor-impact">${sentenceCase(signal.direction)}</p>
-                ${buildSignalBar(signal)}
-              </div>
-            </div>
-          `
-        )
-        .join("")
-    : `<p class="factor-impact">No standout model signals were available.</p>`;
+  const raisesRisk = signals.filter((signal) => signal.direction === "raises risk");
+  const lowersRisk = signals.filter((signal) => signal.direction !== "raises risk");
 
   return `
     <div class="ml-probability-row">
@@ -559,8 +581,13 @@ function buildMlSummary(mlAnalysis) {
         <p class="fact-label">Calibration</p>
         <p class="fact-value">${sentenceCase(mlAnalysis.calibration_method || "unknown")}</p>
       </div>
+      <div class="fact-item">
+        <p class="fact-label">Risk thresholds</p>
+        <p class="fact-value">${formatThresholds(mlAnalysis.decision_thresholds)}</p>
+      </div>
     </div>
     ${buildEvaluationGrid(mlAnalysis.evaluation)}
+    ${buildAgreementPanel(mlAnalysis, ruleClassification, ruleRiskScore)}
     <div class="ml-meta-row">
       <span class="meta-pill">Method: ${humanizeMethod(mlAnalysis.explanation_method)}</span>
       <span class="meta-pill ${mlAnalysis.shap_status === "available" ? "ml-pill-ready" : "ml-pill-pending"}">
@@ -568,7 +595,10 @@ function buildMlSummary(mlAnalysis) {
       </span>
     </div>
     <p class="factor-impact">${mlAnalysis.notes || ""}</p>
-    <div class="factor-list">${signalMarkup}</div>
+    <div class="ml-signal-sections">
+      ${buildSignalSection("Risk-raising signals", raisesRisk, "These pushed the model toward a higher-risk verdict.")}
+      ${buildSignalSection("Reassuring signals", lowersRisk, "These gave the model reasons to be less concerned.")}
+    </div>
     <details class="advanced-details">
       <summary>Model feature vector</summary>
       <div class="advanced-detail-grid">
@@ -618,6 +648,10 @@ function buildModelReportPanel(report) {
           <p class="fact-label">Train / test split</p>
           <p class="fact-value">${splitLabel}</p>
         </div>
+        <div class="fact-item">
+          <p class="fact-label">Decision thresholds</p>
+          <p class="fact-value">${formatThresholds(report.decision_thresholds)}</p>
+        </div>
       </div>
 
       ${buildEvaluationGrid(evaluation)}
@@ -633,11 +667,14 @@ function buildModelReportPanel(report) {
             ${buildFactItem(["Model version", report.model_version || "Unknown"])}
             ${buildFactItem(["Trained at", formatTimestamp(report.trained_at)])}
             ${buildFactItem(["Calibration", sentenceCase(report.calibration_method || "unknown")])}
+            ${buildFactItem(["Datasets used", report.dataset_count ?? 1])}
             ${buildFactItem(["Benchmark runs saved", report.history_count ?? 0])}
           </div>
+          ${buildDatasetNames(report.dataset_names)}
           <div class="factor-list model-candidate-list">
             ${buildCandidateModelRows(report.candidate_models)}
           </div>
+          ${buildBenchmarkHistory(report.history)}
           <div class="model-report-actions">
             <a class="report-link" href="/api/model-report/download">Download model report</a>
           </div>
@@ -728,14 +765,17 @@ function buildContentRows(contentAnalysis) {
     ["Urgency wording", booleanLabel(contentAnalysis.urgency_language_detected)],
     ["Outside scripts", booleanLabel(contentAnalysis.external_scripts_detected)],
     ["Form count", contentAnalysis.form_count ?? "Not fetched"],
+    ["Hidden fields", contentAnalysis.hidden_input_count ?? "Not fetched"],
     ["External form action", booleanLabel(contentAnalysis.form_action_external_detected)],
     ["Brand wording mismatch", booleanLabel(contentAnalysis.brand_impersonation_clues_detected)],
+    ["Meta refresh", booleanLabel(contentAnalysis.meta_refresh_detected)],
     [
       "Brand words seen",
       Array.isArray(contentAnalysis.brand_keywords_detected) && contentAnalysis.brand_keywords_detected.length
         ? contentAnalysis.brand_keywords_detected.join(", ")
         : "None",
     ],
+    ["External links found", contentAnalysis.external_link_count ?? "Not fetched"],
     ["Embedded frame", booleanLabel(contentAnalysis.iframe_detected)],
   ];
 
@@ -857,6 +897,14 @@ function buildBatchRuleSignals(scoreBreakdown) {
     .join("");
 }
 
+function topRuleReason(scoreBreakdown) {
+  const items = Array.isArray(scoreBreakdown) ? scoreBreakdown : [];
+  if (!items.length) {
+    return "No major rule signals";
+  }
+  return items[0].title || items[0].reason || "No major rule signals";
+}
+
 function buildBatchModelSignals(mlAnalysis) {
   if (!mlAnalysis || mlAnalysis.status !== "available") {
     return '<p class="factor-impact">Model output unavailable.</p>';
@@ -883,6 +931,47 @@ function buildBatchModelSignals(mlAnalysis) {
       `
     )
     .join("");
+}
+
+function buildSignalSection(title, signals, emptyCopy) {
+  if (!signals.length) {
+    return `
+      <div class="ml-signal-card">
+        <p class="section-kicker">${title}</p>
+        <p class="factor-impact">${emptyCopy}</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="ml-signal-card">
+      <p class="section-kicker">${title}</p>
+      <div class="factor-list">
+        ${signals
+          .map(
+            (signal) => `
+              <div class="factor-row">
+                <span class="factor-icon ${signal.direction === "raises risk" ? "factor-warn" : "factor-good"}">
+                  ${signal.direction === "raises risk" ? "!" : "✓"}
+                </span>
+                <div class="factor-copy">
+                  <div class="factor-title-row">
+                    <p class="factor-title">${signal.label}</p>
+                    <span class="tooltip-wrap" tabindex="0">
+                      <span class="tooltip-trigger" aria-label="Why this matters">?</span>
+                      <span class="tooltip-bubble">${signal.description}</span>
+                    </span>
+                  </div>
+                  <p class="factor-impact">${sentenceCase(signal.direction)}</p>
+                  ${buildSignalBar(signal)}
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function buildGlobalFeatureRows(features) {
@@ -927,11 +1016,84 @@ function buildCandidateModelRows(models) {
     .join("");
 }
 
+function buildDatasetNames(datasetNames) {
+  const items = Array.isArray(datasetNames) ? datasetNames : [];
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="dataset-name-list">
+      ${items
+        .map(
+          (name) => `
+            <span class="meta-pill">${name}</span>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function buildBenchmarkHistory(history) {
+  const items = Array.isArray(history) ? history.slice(-3).reverse() : [];
+  if (!items.length) {
+    return "";
+  }
+
+  return `
+    <div class="benchmark-history">
+      <p class="section-kicker">Recent Benchmarks</p>
+      <div class="factor-list">
+        ${items
+          .map(
+            (item) => `
+              <div class="candidate-model-row">
+                <div>
+                  <p class="factor-title">${item.model_name || "Unknown model"} · ${item.model_version || "Unknown version"}</p>
+                  <p class="factor-impact">
+                    ${formatTimestamp(item.trained_at)} · F1 ${formatMetric(item.evaluation?.f1_score)} · ROC AUC ${formatMetric(item.evaluation?.roc_auc)}
+                  </p>
+                </div>
+              </div>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buildAgreementPanel(mlAnalysis, ruleClassification, ruleRiskScore) {
+  const modelClassification = mlAnalysis.predicted_classification || "unknown";
+  const agrees = modelClassification === ruleClassification;
+  const toneClass = agrees ? "agreement-positive" : "agreement-warning";
+  const title = agrees ? "Rule and model agree" : "Rule and model differ";
+  const copy = agrees
+    ? `Both checks point to ${sentenceCase(ruleClassification)} for this link.`
+    : `Rules say ${sentenceCase(ruleClassification)}, while the model leans ${sentenceCase(modelClassification)}.`;
+
+  return `
+    <div class="agreement-card ${toneClass}">
+      <div>
+        <p class="fact-label">Agreement check</p>
+        <p class="agreement-title">${title}</p>
+        <p class="factor-impact">${copy}</p>
+      </div>
+      <div class="agreement-metrics">
+        <span class="meta-pill">Rule score ${ruleRiskScore}/100</span>
+        <span class="meta-pill">Model risk ${mlAnalysis.prediction_probability}%</span>
+      </div>
+    </div>
+  `;
+}
+
 function buildSignalBar(signal) {
   const width = Math.max(6, Math.min(Number(signal.strength_pct || 0), 100));
   const toneClass = signal.direction === "raises risk" ? "signal-meter-risk" : "signal-meter-safe";
   return `
-    <div class="signal-meter">
+    <div class="signal-meter signal-meter-split ${signal.direction === "raises risk" ? "signal-meter-right" : "signal-meter-left"}">
+      <div class="signal-meter-center"></div>
       <div class="signal-meter-fill ${toneClass}" style="width: ${width}%"></div>
     </div>
   `;
@@ -968,6 +1130,14 @@ function buildEvaluationGrid(evaluation) {
       <div class="fact-item">
         <p class="fact-label">F1 Score</p>
         <p class="fact-value">${formatMetric(evaluation.f1_score)}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">ROC AUC</p>
+        <p class="fact-value">${formatMetric(evaluation.roc_auc)}</p>
+      </div>
+      <div class="fact-item">
+        <p class="fact-label">Avg Precision</p>
+        <p class="fact-value">${formatMetric(evaluation.average_precision)}</p>
       </div>
     </div>
   `;
@@ -1016,6 +1186,18 @@ function buildSplitLabel(trainRows, testRows) {
   const trainPct = Math.round((trainRows / total) * 100);
   const testPct = Math.round((testRows / total) * 100);
   return `${trainPct}/${testPct} (${trainRows.toLocaleString()} train, ${testRows.toLocaleString()} test)`;
+}
+
+function formatThresholds(thresholds) {
+  if (!thresholds || typeof thresholds !== "object") {
+    return "Unknown";
+  }
+  const safe = Number(thresholds.safe);
+  const phishing = Number(thresholds.phishing);
+  if (Number.isNaN(safe) || Number.isNaN(phishing)) {
+    return "Unknown";
+  }
+  return `${safe.toFixed(2)} / ${phishing.toFixed(2)}`;
 }
 
 function bindBatchControls() {
@@ -1091,6 +1273,72 @@ function buildBatchSummaryCards(summary) {
     .join("");
 }
 
+function buildBatchInsights(results) {
+  if (!results.length) {
+    return "";
+  }
+
+  const highestRisk = results.reduce(
+    (best, item) => (item.risk_score > best.risk_score ? item : best),
+    results[0]
+  );
+  const averageModelRisk =
+    results.reduce((total, item) => total + getModelProbability(item.ml_analysis), 0) /
+    results.length;
+  const topReason = topRepeatedRuleReason(results);
+
+  const insights = [
+    ["Highest score", `${highestRisk.risk_score}/100`, highestRisk.url],
+    ["Average model risk", `${averageModelRisk.toFixed(1)}%`, "Across the visible rows"],
+    ["Most repeated signal", topReason, "Across the visible rows"],
+  ];
+
+  return insights
+    .map(
+      ([label, value, detail]) => `
+        <div class="batch-insight-card">
+          <p class="fact-label">${label}</p>
+          <p class="batch-insight-value">${value}</p>
+          <p class="factor-impact">${detail}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function humanBatchFilter(filterValue) {
+  if (filterValue === "phishing") {
+    return "Likely phishing";
+  }
+  if (filterValue === "suspicious") {
+    return "Use caution";
+  }
+  if (filterValue === "safe") {
+    return "Looks safe";
+  }
+  return "All results";
+}
+
+function topRepeatedRuleReason(results) {
+  const counts = new Map();
+
+  results.forEach((item) => {
+    const reason = topRuleReason(item.score_breakdown);
+    counts.set(reason, (counts.get(reason) || 0) + 1);
+  });
+
+  let bestReason = "No major rule signals";
+  let bestCount = -1;
+  counts.forEach((count, reason) => {
+    if (count > bestCount) {
+      bestReason = reason;
+      bestCount = count;
+    }
+  });
+
+  return bestReason;
+}
+
 function getModelProbability(mlAnalysis) {
   if (!mlAnalysis || mlAnalysis.status !== "available") {
     return -1;
@@ -1104,13 +1352,14 @@ function downloadBatchCsv() {
   }
 
   const rows = [
-    ["url", "classification", "risk_score", "model_risk", "similar_group_size"],
+    ["url", "classification", "risk_score", "model_risk", "pattern_matches", "top_rule_reason"],
     ...getFilteredBatchResults().map((item) => [
       item.url,
       item.classification,
       item.risk_score,
       formatModelRisk(item.ml_analysis),
       item.similar_group_size,
+      topRuleReason(item.score_breakdown),
     ]),
   ];
   const csv = rows
@@ -1126,6 +1375,24 @@ function downloadBatchCsv() {
   const link = document.createElement("a");
   link.href = downloadUrl;
   link.download = "nexus-sentinel-batch-results.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(downloadUrl);
+}
+
+function downloadSingleResult() {
+  if (!currentSingleResult) {
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(currentSingleResult, null, 2)], {
+    type: "application/json",
+  });
+  const downloadUrl = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = "nexus-sentinel-single-result.json";
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
