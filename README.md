@@ -1,56 +1,124 @@
 # Nexus Sentinel
 
-Nexus Sentinel is a local phishing-analysis dashboard that helps you inspect suspicious links, explain why they look risky, and review batches of URLs from a CSV file.
+Nexus Sentinel is a phishing-analysis dashboard for checking suspicious links one at a time or in batches from a CSV file.
 
-It is designed to feel like a realistic security tool without turning into an overcomplicated enterprise app. The focus is clarity:
+The product focuses on three things:
 
-- enter a URL and get a risk score
-- understand the reasons behind the score
-- upload a CSV when you need to analyze many links at once
-- keep scans private by default in the dashboard
+- clear link risk scoring
+- explanations that a normal person can actually understand
+- a lightweight ML layer with SHAP-backed reasoning
 
-## What It Does
+It is still being built locally today, but the direction is toward a public web product later.
 
-### 1. Single URL Analysis
+## Core Experience
 
-Paste a URL and Nexus Sentinel checks:
+### Single Link Analysis
+
+You can paste one URL and Nexus Sentinel will inspect:
 
 - URL structure
 - suspicious keywords
-- high-risk endings like `.top` or `.xyz`
-- encoded characters
+- risky website endings such as `.top` and `.xyz`
 - IP-based hostnames
+- encoded characters
 - redirect behavior
-- page signals such as login forms, password fields, and urgency language
+- live page signals such as login forms, password fields, hidden fields, urgent wording, and embedded frames
 
 The result includes:
 
 - risk score out of 100
-- classification: `safe`, `suspicious`, or `phishing`
-- plain-language explanations of why the link was flagged
+- `safe`, `suspicious`, or `phishing` classification
+- plain-language explanations
 - page check details
 - destination check details
-- an ML model check with explanation signals
+- model-based explanation signals
 
-### 2. Batch URL Upload
+### Batch CSV Analysis
 
-Upload a CSV file with up to 100 URLs and Nexus Sentinel will analyze them together in a table.
+You can upload a CSV with up to 100 URLs and review them in a table.
 
-This is useful for workflows like:
+The batch workflow now supports:
 
-- checking suspicious email links from a mailbox export
-- reviewing a list from security logs
-- triaging reported links from a team
+- summary cards
+- filtering by result type
+- sorting by score, model risk, or URL
+- row-level explanation expansion
+- CSV export of analyzed results
+- a sample CSV shortcut in the interface
 
-### 3. Educational Guidance
+### Educational Guidance
 
-The dashboard includes:
+The interface also includes:
 
-- plain-language risk explanations
-- security tips for normal users
-- example URLs you can test safely in the interface
+- “Why this matters” tooltips
+- plain-language risk tips
+- safe example links for testing
 
-The goal is not just detection. It is also helping the person using the tool understand what they are looking at.
+The goal is not just detection. It is to help someone understand why a link deserves caution.
+
+## Detection Layers
+
+Nexus Sentinel currently combines:
+
+1. **Rule-based analysis**
+   - direct scoring rules for URL and live page signals
+
+2. **Live page and redirect checks**
+   - login/password form detection
+   - urgent wording detection
+   - external script detection
+   - external form action detection
+   - hidden field count
+   - iframe detection
+   - brand wording mismatch clues
+   - redirect chain analysis
+   - cross-domain hops
+   - HTTPS-to-HTTP downgrade detection
+
+3. **Machine learning**
+   - a dataset-backed classifier
+   - model comparison and selection
+   - calibrated probabilities
+   - SHAP-based explanation signals when the ML environment is available
+
+## ML and Explainability
+
+Nexus Sentinel includes a real dataset-backed ML layer alongside the rule engine.
+
+- primary model family: tree-based classifiers
+- selected model in the current build: `RandomForestClassifier`
+- explanation layer: `SHAP`
+- calibration: sigmoid calibration when available
+- fallback path: lightweight local proxy model if the full ML stack is unavailable
+
+### Training Data
+
+- dataset source: `ESDAUNG PhishDataset balanced set`
+- dataset size: `20,000` labeled URL rows
+- train/test split: `80/20`
+- training rows: `16,000`
+- test rows: `4,000`
+
+The current build can also resolve multiple local dataset files through the configured dataset path and tracks dataset versions in the model report.
+
+### Current Benchmark
+
+The current held-out benchmark in this build is based on the real dataset-backed model report:
+
+- accuracy: `0.8905`
+- precision: `0.9194`
+- recall: `0.8560`
+- F1 score: `0.8866`
+
+The app also surfaces additional evaluation details in the dashboard model report, including:
+
+- confusion matrix
+- ROC AUC
+- average precision
+- candidate model comparison
+- decision thresholds
+- recent benchmark history
+- dataset set/version tracking when multiple local datasets are used
 
 ## Current Stack
 
@@ -62,21 +130,7 @@ The goal is not just detection. It is also helping the person using the tool und
 - `unittest`
 - optional local ML stack in `requirements-ml.txt`
 
-No framework has been added yet. This is still a lightweight local build.
-
-## ML and Explainability
-
-Nexus Sentinel now includes a real dataset-backed ML layer alongside the rule engine.
-
-- model: `RandomForestClassifier`
-- explanation layer: `SHAP`
-- dataset: `ESDAUNG PhishDataset balanced set`
-- dataset size: `20,000` labeled URL rows
-- split: `80/20` train/test
-- training rows: `16,000`
-- test rows: `4,000`
-
-The trained model and evaluation report are cached locally for reuse during development. The dashboard also surfaces model confidence signals and SHAP-backed explanations when the app is run through the local `.venv`.
+This is still a lightweight build. A larger framework has not been introduced yet.
 
 ## Project Structure
 
@@ -86,6 +140,7 @@ NexusSentinel/
 │   ├── __init__.py
 │   ├── detector.py
 │   ├── live_checks.py
+│   ├── ml.py
 │   ├── service.py
 │   ├── web.py
 │   └── webapp/
@@ -99,58 +154,55 @@ NexusSentinel/
 └── README.md
 ```
 
-## Current Development State
-
-Nexus Sentinel is currently in an active build stage.
-
-Right now the project is focused on:
-
-- improving the phishing detection flow
-- making the explanations clearer for normal users
-- strengthening the ML and SHAP layers
-- shaping the dashboard into something deployment-ready
-
-The intention is to deploy Nexus Sentinel later as a hosted web product, not keep it as a local setup guide.
-
-## Privacy
-
-The dashboard is now intended to behave as a **private local tool**.
-
-- scans from the current interface are treated as private by default
-- the UI does not ask the user to make a scan public
-- there is no public clear-history control in the dashboard
-
-Important note:
-
-This is still a development-stage product, not yet a deployed multi-user system with authentication or per-user workspaces.
-
-## Current Model workflow 
+## What Is Already Working
 
 - single URL analysis
-- risk scoring
-- phishing classification
-- page check signals
-- redirect checks
 - batch CSV analysis
-- plain-language risk explanations
-- tooltip-based "Why this matters" explanations
-- ML model output from a real dataset-backed Random Forest classifier
-- SHAP-based explanations in the UI when the app is run from the local `.venv`
-- fallback model behavior when the full local ML stack is unavailable
-- cached training artifacts and evaluation report for the current model
+- rule-based phishing scoring
+- live page checks
+- redirect tracing checks
+- educational tooltips and risk explanations
+- model report panel in the UI
+- SHAP-backed explanation flow
+- rule-versus-model agreement view
+- candidate model comparison in the report
+- benchmark history in the model report
+- downloadable batch result CSV
+- downloadable model report JSON
 - theme toggle
 - test coverage for core flows
 
-## Current Model Benchmark
+## Current Product State
 
-The current dataset-backed Random Forest model is trained from the bundled balanced phishing URL dataset and evaluated on a held-out `80/20` split.
+Nexus Sentinel is in an active refinement stage.
 
-- training samples: `16000`
-- test samples: `4000`
-- accuracy: `0.8905`
-- precision: `0.9194`
-- recall: `0.8560`
-- F1 score: `0.8866`
+The current focus is on:
 
-This is a useful step forward from synthetic training, but it is still not the final model. The next improvement is broadening the training data so the model sees more modern and varied phishing patterns.
+- improving detection quality
+- improving model quality with broader data
+- making explanations easier to read
+- tightening the dashboard experience before deployment
 
+## Privacy and Product Direction
+
+This build behaves like a private local tool right now for single-link usage, but the longer-term direction is a public-facing website or app.
+
+That means the current implementation is still a development build, not the final hosted privacy model.
+
+## What Is Still Ahead
+
+- broader and newer phishing + benign datasets
+- richer SHAP visualizations
+- more polished batch analyst workflows
+- deployment preparation
+- final public hosting
+
+## Direction
+
+The long-term direction for Nexus Sentinel is:
+
+- a deployed web product
+- strong explainability without a confusing interface
+- better model quality with real data
+- practical analyst workflows such as batch triage
+- an experience that teaches users, not just scores links
