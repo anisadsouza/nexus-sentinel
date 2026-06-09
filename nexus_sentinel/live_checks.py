@@ -69,6 +69,9 @@ class _SignalHTMLParser(HTMLParser):
         self.external_scripts_detected = False
         self.form_action_external_detected = False
         self.iframe_detected = False
+        self.hidden_input_count = 0
+        self.meta_refresh_detected = False
+        self.external_link_count = 0
         self._in_title = False
 
     def handle_starttag(self, tag: str, attrs) -> None:
@@ -94,6 +97,8 @@ class _SignalHTMLParser(HTMLParser):
 
         if tag_lower == "input":
             field_type = (attrs_map.get("type") or "").strip().lower()
+            if field_type == "hidden":
+                self.hidden_input_count += 1
             if field_type == "password":
                 self.password_field_detected = True
                 self.login_form_detected = True
@@ -118,6 +123,22 @@ class _SignalHTMLParser(HTMLParser):
 
         if tag_lower == "iframe":
             self.iframe_detected = True
+            return
+
+        if tag_lower == "meta":
+            http_equiv = (attrs_map.get("http-equiv") or "").strip().lower()
+            content = (attrs_map.get("content") or "").strip().lower()
+            if http_equiv == "refresh" and content:
+                self.meta_refresh_detected = True
+            return
+
+        if tag_lower == "a":
+            href = attrs_map.get("href", "")
+            if href:
+                resolved = urljoin(self.base_url, href)
+                link_host = urlparse(resolved).hostname or ""
+                if link_host and self.final_host and link_host != self.final_host:
+                    self.external_link_count += 1
 
     def handle_endtag(self, tag: str) -> None:
         if tag.lower() == "title":
@@ -211,6 +232,9 @@ def run_live_checks(
         "brand_impersonation_clues_detected": brand_impersonation_clues_detected,
         "brand_keywords_detected": brand_keywords,
         "iframe_detected": parser.iframe_detected,
+        "hidden_input_count": parser.hidden_input_count,
+        "meta_refresh_detected": parser.meta_refresh_detected,
+        "external_link_count": parser.external_link_count,
         "form_count": parser.form_count,
         "notes": _build_content_note(
             parser=parser,
@@ -303,6 +327,10 @@ def _build_content_note(
         highlights.append("brand wording does not match the hostname")
     if parser.iframe_detected:
         highlights.append("embedded frame detected")
+    if parser.meta_refresh_detected:
+        highlights.append("meta refresh redirect detected")
+    if parser.hidden_input_count >= 5:
+        highlights.append("many hidden fields detected")
 
     if not highlights:
         return "Live webpage content was fetched successfully."
@@ -343,6 +371,9 @@ def _unavailable_content(reason: str) -> dict[str, object]:
         "brand_impersonation_clues_detected": None,
         "brand_keywords_detected": [],
         "iframe_detected": None,
+        "hidden_input_count": None,
+        "meta_refresh_detected": None,
+        "external_link_count": None,
         "form_count": None,
         "notes": f"Live webpage content could not be fetched: {reason}.",
     }
