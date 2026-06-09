@@ -40,6 +40,7 @@ You can upload a CSV with up to 100 URLs and review them in a table.
 The batch workflow now supports:
 
 - summary cards
+- insight cards
 - filtering by result type
 - sorting by score, model risk, or URL
 - row-level explanation expansion
@@ -168,6 +169,7 @@ NexusSentinel/
 - candidate model comparison in the report
 - benchmark history in the model report
 - downloadable batch result CSV
+- downloadable single-result JSON
 - downloadable model report JSON
 - theme toggle
 - test coverage for core flows
