@@ -210,6 +210,20 @@ def _score_features(
     )
 
     add_rule(
+        bool(content_analysis.get("meta_refresh_detected")),
+        5,
+        "meta_refresh",
+        "Page uses a meta refresh redirect",
+    )
+
+    add_rule(
+        int(content_analysis.get("hidden_input_count") or 0) >= 5,
+        4,
+        "many_hidden_inputs",
+        "Page contains many hidden form fields",
+    )
+
+    add_rule(
         bool(redirect_analysis.get("cross_domain_redirect_detected")),
         10,
         "cross_domain_redirect",
@@ -269,6 +283,9 @@ def _build_content_analysis_placeholder() -> dict[str, object]:
         "brand_impersonation_clues_detected": None,
         "brand_keywords_detected": [],
         "iframe_detected": None,
+        "hidden_input_count": None,
+        "meta_refresh_detected": None,
+        "external_link_count": None,
         "form_count": None,
         "notes": "Live webpage content analysis has not been enabled yet.",
     }
@@ -372,6 +389,14 @@ def _rule_explanation(label: str) -> tuple[str, str]:
         "iframe_detected": (
             "Embedded frame detected",
             "Embedded frames can be used to hide content from another site inside a suspicious page.",
+        ),
+        "meta_refresh": (
+            "Meta refresh redirect",
+            "Pages that auto-refresh to another location can be trying to hide where they send you.",
+        ),
+        "many_hidden_inputs": (
+            "Many hidden form fields",
+            "A page with lots of hidden form fields can be disguising what gets submitted behind the scenes.",
         ),
         "cross_domain_redirect": (
             "Redirect to another site",
