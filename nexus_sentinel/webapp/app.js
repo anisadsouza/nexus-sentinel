@@ -9,6 +9,7 @@ const batchSampleButton = document.getElementById("batch-sample-button");
 const batchMessage = document.getElementById("batch-message");
 const batchResults = document.getElementById("batch-results");
 const modelReportPanel = document.getElementById("model-report-panel");
+const threatLensPanel = document.getElementById("threatlens-results");
 const themeToggle = document.getElementById("theme-toggle");
 const themeToggleIcon = document.getElementById("theme-toggle-icon");
 const clearUrlButton = document.getElementById("clear-url");
@@ -22,6 +23,7 @@ let batchSortValue = "score_desc";
 
 applyTheme(loadThemePreference());
 loadModelReport();
+loadThreatLens();
 
 themeToggle.addEventListener("click", () => {
   const nextTheme = document.body.dataset.theme === "dark" ? "light" : "dark";
@@ -61,6 +63,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     renderResult(data);
+    loadThreatLens();
     formMessage.textContent = "Analysis complete.";
     formMessage.className = "form-message success";
   } catch (error) {
@@ -130,6 +133,7 @@ batchAnalyzeButton.addEventListener("click", async () => {
     }
 
     renderBatchResults(data);
+    loadThreatLens();
     batchMessage.textContent = `Batch complete. ${data.summary.total_urls} links analyzed.`;
     batchMessage.className = "form-message success";
   } catch (error) {
@@ -231,11 +235,6 @@ function renderResult(data) {
 
     <div class="result-grid result-grid-secondary">
       <section class="result-card">
-        <p class="section-kicker">Link details</p>
-        <div class="fact-grid">${buildFactRows(features)}</div>
-      </section>
-
-      <section class="result-card">
         <p class="section-kicker">Page check</p>
         <div class="content-status-row">
           <span class="risk-pill ${contentAnalysis.status === "fetched" ? "status-safe" : "status-suspicious"}">
@@ -261,9 +260,7 @@ function renderResult(data) {
 
       <section class="result-card">
         <p class="section-kicker">Model check</p>
-        <div class="ml-summary">
-          ${buildMlSummary(mlAnalysis, data.classification, data.risk_score)}
-        </div>
+        <div class="ml-summary">${buildCompactMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
       </section>
     </div>
 
@@ -273,6 +270,20 @@ function renderResult(data) {
         <div class="info-list">${buildTips(data, features)}</div>
       </section>
     </div>
+
+    <details class="advanced-details result-advanced-details">
+      <summary>More details</summary>
+      <div class="result-grid result-grid-secondary result-advanced-grid">
+        <section class="result-card">
+          <p class="section-kicker">Link details</p>
+          <div class="fact-grid">${buildFactRows(features)}</div>
+        </section>
+        <section class="result-card">
+          <p class="section-kicker">Full model details</p>
+          <div class="ml-summary">${buildMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
+        </section>
+      </div>
+    </details>
 
     <div class="result-actions">
       <button id="download-single-report" type="button" class="secondary">Download result JSON</button>
@@ -442,6 +453,178 @@ async function loadModelReport() {
   }
 }
 
+async function loadThreatLens() {
+  if (!threatLensPanel) {
+    return;
+  }
+
+  threatLensPanel.innerHTML = '<p class="muted">Loading ThreatLens...</p>';
+
+  try {
+    const response = await fetch("/api/threatlens");
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Unable to load ThreatLens.");
+    }
+
+    threatLensPanel.innerHTML = buildThreatLensPanel(data.threatlens || {});
+  } catch (error) {
+    threatLensPanel.innerHTML = `
+      <div class="result-card">
+        <p class="section-kicker">ThreatLens</p>
+        <p class="factor-title">ThreatLens is unavailable right now</p>
+        <p class="factor-impact">${error.message}</p>
+      </div>
+    `;
+  }
+}
+
+function buildThreatLensPanel(summary) {
+  const overview = summary.overview || {};
+  const classifications = summary.classification_breakdown || {};
+  const topTheme = firstThreatLensLabel(summary.top_themes, "No theme yet");
+  const topGroups = Array.isArray(summary.top_similar_groups) ? summary.top_similar_groups : [];
+  const trend = Array.isArray(summary.daily_trend) ? summary.daily_trend : [];
+  const trendChange = summary.trend_change || {};
+
+  return `
+    <div class="threatlens-shell">
+      <div class="result-card threatlens-summary-card">
+        <p class="section-kicker">ThreatLens Summary</p>
+        <p class="threatlens-summary-copy">${summary.generated_summary || "ThreatLens will summarize saved results here."}</p>
+        <p class="helper-copy threatlens-helper">
+          This view reads saved scan history. Private one-off checks stay out of it.
+        </p>
+      </div>
+
+      <div class="threatlens-metrics">
+        ${buildThreatLensMetric("Saved scans", overview.total_scans || 0, "Saved analysis records")}
+        ${buildThreatLensMetric("Likely phishing", classifications.phishing || 0, "High-risk results in history")}
+        ${buildThreatLensMetric("Top theme", topTheme, "Most repeated phishing theme")}
+        ${buildThreatLensMetric("Activity trend", trendChange.label || "No saved trend yet", "Compared with the earlier saved window")}
+      </div>
+
+      <div class="result-grid result-grid-secondary">
+        <section class="result-card">
+          <p class="section-kicker">Top Threat Groups</p>
+          ${buildThreatLensGroups(topGroups)}
+        </section>
+        <section class="result-card">
+          <p class="section-kicker">Threat Trend</p>
+          ${buildThreatLensTrend(trend)}
+        </section>
+      </div>
+
+      <div class="result-grid result-grid-secondary">
+        <section class="result-card">
+          <p class="section-kicker">Threat Themes</p>
+          ${buildThreatLensCountList(summary.top_themes, "No saved themes yet.")}
+        </section>
+        <section class="result-card">
+          <p class="section-kicker">Repeated Warning Signs</p>
+          ${buildThreatLensCountList(summary.top_risk_signals, "No repeated warning signs yet.")}
+        </section>
+      </div>
+    </div>
+  `;
+}
+
+function buildThreatLensMetric(label, value, copy) {
+  return `
+    <article class="batch-summary-card threatlens-metric-card">
+      <p class="fact-label">${label}</p>
+      <p class="batch-summary-value">${value}</p>
+      <p class="factor-impact">${copy}</p>
+    </article>
+  `;
+}
+
+function buildThreatLensGroups(groups) {
+  const items = Array.isArray(groups) ? groups : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No saved groups yet. Once saved phishing-style links build up, ThreatLens will surface the biggest repeated patterns here.</p>';
+  }
+
+  return `
+    <div class="factor-list">
+      ${items
+        .map(
+          (group) => `
+            <div class="candidate-model-row threatlens-group-row">
+              <div>
+                <p class="factor-title">${group.size} related link${group.size === 1 ? "" : "s"} · ${sentenceCase(group.classification)}</p>
+                <p class="factor-impact">${group.grouping_reason}</p>
+                <p class="threatlens-inline-meta">
+                  First seen ${formatShortDate(group.first_seen)} · Latest seen ${formatShortDate(group.latest_seen)}
+                </p>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function buildThreatLensTrend(trend) {
+  const items = Array.isArray(trend) ? trend : [];
+  if (!items.length) {
+    return '<p class="factor-impact">No saved scan history yet for trend analysis.</p>';
+  }
+
+  return `
+    <div class="factor-list">
+      ${items
+        .map(
+          (item) => `
+            <div class="candidate-model-row threatlens-trend-row">
+              <div>
+                <p class="factor-title">${formatShortDate(item.date)} · ${item.total} total</p>
+                <p class="factor-impact">
+                  ${item.phishing} phishing · ${item.suspicious} suspicious · ${item.safe} safe
+                </p>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function buildThreatLensCountList(items, emptyCopy) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return `<p class="factor-impact">${emptyCopy}</p>`;
+  }
+
+  return `
+    <div class="factor-list">
+      ${rows
+        .map(
+          (item) => `
+            <div class="factor-row">
+              <span class="factor-icon factor-warn">i</span>
+              <div class="factor-copy">
+                <p class="factor-title">${item.label}</p>
+                <p class="factor-impact">${item.count} saved link${item.count === 1 ? "" : "s"}</p>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function firstThreatLensLabel(items, fallback) {
+  if (!Array.isArray(items) || !items.length) {
+    return fallback;
+  }
+  return items[0].label || fallback;
+}
+
 function setAnalyzeButtonState(isLoading) {
   analyzeButton.disabled = isLoading;
   analyzeButton.textContent = isLoading ? "Analyzing..." : "Analyze";
@@ -608,6 +791,47 @@ function buildMlSummary(mlAnalysis, ruleClassification, ruleRiskScore) {
   `;
 }
 
+function buildCompactMlSummary(mlAnalysis, ruleClassification, ruleRiskScore) {
+  if (mlAnalysis.status !== "available") {
+    return `
+      <p class="factor-impact">${mlAnalysis.notes || "The model explanation is unavailable right now."}</p>
+    `;
+  }
+
+  const agrees =
+    (mlAnalysis.predicted_classification || "unknown") === ruleClassification;
+  const leadingSignal =
+    Array.isArray(mlAnalysis.top_signals) && mlAnalysis.top_signals.length
+      ? mlAnalysis.top_signals[0]
+      : null;
+
+  return `
+    <div class="ml-probability-row">
+      <span class="risk-pill ${statusClass(mlAnalysis.predicted_classification)}">
+        ${sentenceCase(mlAnalysis.predicted_classification)}
+      </span>
+      <p class="ml-probability">${mlAnalysis.prediction_probability}% model risk</p>
+      <span class="meta-pill">${agrees ? "Agrees with rule score" : "Differs from rule score"}</span>
+    </div>
+    <div class="fact-grid compact-fact-grid">
+      ${buildFactItem(["Model", mlAnalysis.model_name || "Unknown"])}
+      ${buildFactItem(["Method", humanizeMethod(mlAnalysis.explanation_method)])}
+      ${buildFactItem(["Confidence", sentenceCase(mlAnalysis.confidence_label || "unknown")])}
+      ${buildFactItem(["Rule score", `${ruleRiskScore}/100`])}
+    </div>
+    ${
+      leadingSignal
+        ? `
+          <div class="compact-ml-note">
+            <p class="factor-title">${leadingSignal.label}</p>
+            <p class="factor-impact">${leadingSignal.description}</p>
+          </div>
+        `
+        : `<p class="factor-impact">${mlAnalysis.notes || "No standout model signals were returned."}</p>`
+    }
+  `;
+}
+
 function buildModelReportPanel(report) {
   const evaluation = report.evaluation || {};
   const trainingSamples = report.training_samples ?? "Unknown";
@@ -625,7 +849,7 @@ function buildModelReportPanel(report) {
           <p class="section-kicker">Model Report</p>
           <h3 class="model-report-title">Current ML snapshot</h3>
           <p class="model-report-copy">
-            Real phishing data, cached training, and SHAP-backed explanations when the full ML environment is available.
+            A quick view of the model behind the scanner, with the deeper benchmark details tucked just below.
           </p>
         </div>
         <span class="meta-pill model-report-pill">${trainingSamples} rows</span>
@@ -653,33 +877,36 @@ function buildModelReportPanel(report) {
           <p class="fact-value">${formatThresholds(report.decision_thresholds)}</p>
         </div>
       </div>
-
       ${buildEvaluationGrid(evaluation)}
-      ${buildConfusionMatrix(evaluation)}
-      <div class="model-report-grid">
-        <section class="model-report-section">
-          <p class="section-kicker">Most influential features</p>
-          <div class="factor-list">${buildGlobalFeatureRows(report.global_top_features)}</div>
-        </section>
-        <section class="model-report-section">
-          <p class="section-kicker">Training metadata</p>
-          <div class="fact-grid">
-            ${buildFactItem(["Model version", report.model_version || "Unknown"])}
-            ${buildFactItem(["Trained at", formatTimestamp(report.trained_at)])}
-            ${buildFactItem(["Calibration", sentenceCase(report.calibration_method || "unknown")])}
-            ${buildFactItem(["Datasets used", report.dataset_count ?? 1])}
-            ${buildFactItem(["Benchmark runs saved", report.history_count ?? 0])}
-          </div>
-          ${buildDatasetNames(report.dataset_names)}
-          <div class="factor-list model-candidate-list">
-            ${buildCandidateModelRows(report.candidate_models)}
-          </div>
-          ${buildBenchmarkHistory(report.history)}
-          <div class="model-report-actions">
-            <a class="report-link" href="/api/model-report/download">Download model report</a>
-          </div>
-        </section>
-      </div>
+
+      <details class="advanced-details model-report-details">
+        <summary>Full model report</summary>
+        ${buildConfusionMatrix(evaluation)}
+        <div class="model-report-grid">
+          <section class="model-report-section">
+            <p class="section-kicker">Most influential features</p>
+            <div class="factor-list">${buildGlobalFeatureRows(report.global_top_features)}</div>
+          </section>
+          <section class="model-report-section">
+            <p class="section-kicker">Training metadata</p>
+            <div class="fact-grid">
+              ${buildFactItem(["Model version", report.model_version || "Unknown"])}
+              ${buildFactItem(["Trained at", formatTimestamp(report.trained_at)])}
+              ${buildFactItem(["Calibration", sentenceCase(report.calibration_method || "unknown")])}
+              ${buildFactItem(["Datasets used", report.dataset_count ?? 1])}
+              ${buildFactItem(["Benchmark runs saved", report.history_count ?? 0])}
+            </div>
+            ${buildDatasetNames(report.dataset_names)}
+            <div class="factor-list model-candidate-list">
+              ${buildCandidateModelRows(report.candidate_models)}
+            </div>
+            ${buildBenchmarkHistory(report.history)}
+            <div class="model-report-actions">
+              <a class="report-link" href="/api/model-report/download">Download model report</a>
+            </div>
+          </section>
+        </div>
+      </details>
     </div>
   `;
 }
@@ -1464,6 +1691,23 @@ function formatTimestamp(timestamp) {
   }
 
   return date.toLocaleString();
+}
+
+function formatShortDate(value) {
+  if (!value) {
+    return "Unknown date";
+  }
+
+  const date = new Date(value.length <= 10 ? `${value}T00:00:00Z` : value);
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown date";
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
 }
 
 function loadThemePreference() {
