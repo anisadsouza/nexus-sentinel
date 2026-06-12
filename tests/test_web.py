@@ -155,6 +155,31 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("dataset_paths", payload["model_report"])
         self.assertIn("decision_thresholds", payload["model_report"])
 
+    def test_threatlens_endpoint_returns_summary_payload(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+            _run_app(
+                app,
+                path="/api/analyze",
+                query_string=(
+                    "url=http%3A%2F%2Fsecure-login.example.com.verify-account.test"
+                    "%2Freset%3Fuser%3D1%26a%3D2%26b%3D3%26c%3D4%26d%3D5"
+                    "&private=0"
+                ),
+            )
+
+            status, headers, body = _run_app(app, path="/api/threatlens")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertIn("threatlens", payload)
+        self.assertIn("overview", payload["threatlens"])
+        self.assertIn("classification_breakdown", payload["threatlens"])
+        self.assertIn("top_similar_groups", payload["threatlens"])
+        self.assertIn("trend_change", payload["threatlens"])
+        self.assertIn("generated_summary", payload["threatlens"])
+
     def test_model_report_download_endpoint_returns_attachment(self) -> None:
         app = DashboardApp()
 
