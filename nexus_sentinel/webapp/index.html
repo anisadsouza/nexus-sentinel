@@ -28,21 +28,24 @@
     <main class="layout">
       <section class="hero">
         <p class="eyebrow">Phishing link analysis</p>
-        <h1>Check one link, a whole CSV, or a few safe examples.</h1>
+        <h1>Check a link, a CSV list, or the bigger threat picture.</h1>
         <p class="lede">
-          Nexus Sentinel keeps the experience simple: analyze a URL, review the risk just below it, or switch to batch mode when you have a list.
+          Start with one link, switch to batch when you have a list, or open ThreatLens to see what saved phishing activity is showing over time.
         </p>
       </section>
 
       <nav class="workspace-tabs" aria-label="Dashboard sections">
         <button type="button" class="workspace-tab is-active" data-panel-target="url-panel">
-          This URL
+          Link Check
         </button>
         <button type="button" class="workspace-tab" data-panel-target="batch-panel">
-          Batch CSV
+          Batch
+        </button>
+        <button type="button" class="workspace-tab" data-panel-target="threatlens-panel">
+          ThreatLens
         </button>
         <button type="button" class="workspace-tab" data-panel-target="tips-panel">
-          Tips and Suggestions
+          Tips
         </button>
       </nav>
 
@@ -51,6 +54,7 @@
           <div>
             <p class="section-kicker">Single URL</p>
             <h2>Analyze a single link</h2>
+            <p class="panel-copy">The result appears just below with the main risk call, plain-language reasons, and a few deeper checks.</p>
           </div>
         </div>
 
@@ -124,6 +128,22 @@
 
         <section id="batch-results" class="batch-results-panel" aria-live="polite">
           <p class="muted">No batch upload yet.</p>
+        </section>
+      </section>
+
+      <section id="threatlens-panel" class="workspace-panel" hidden>
+        <div class="panel-head">
+          <div>
+            <p class="section-kicker">ThreatLens</p>
+            <h2>What saved results are saying together</h2>
+            <p class="panel-copy">
+              ThreatLens turns saved scans into simple themes, trends, and repeated threat patterns.
+            </p>
+          </div>
+        </div>
+
+        <section id="threatlens-results" class="threatlens-panel" aria-live="polite">
+          <p class="muted">Loading ThreatLens...</p>
         </section>
       </section>
 

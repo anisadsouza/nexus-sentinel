@@ -777,6 +777,47 @@ button:disabled {
   background: var(--surface);
 }
 
+.threatlens-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.threatlens-summary-card {
+  border-top: 3px solid var(--accent);
+}
+
+.threatlens-summary-copy {
+  margin-bottom: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.threatlens-helper {
+  margin-top: 10px;
+}
+
+.threatlens-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.threatlens-metric-card {
+  min-height: 100%;
+}
+
+.threatlens-metric-card .batch-summary-value {
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.threatlens-inline-meta {
+  margin-bottom: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .batch-insight-card {
   padding: 14px 16px;
   border: 1px solid var(--border);
@@ -1058,6 +1099,36 @@ button:disabled {
   margin-top: 14px;
 }
 
+.advanced-details {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.advanced-details summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.result-advanced-grid {
+  margin-top: 14px;
+}
+
+.compact-fact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compact-ml-note {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
 .result-actions {
   display: flex;
   justify-content: flex-end;
@@ -1131,6 +1202,10 @@ button:disabled {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .threatlens-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .batch-insights-grid {
     grid-template-columns: 1fr;
   }
@@ -1174,6 +1249,7 @@ button:disabled {
   }
 
   .batch-summary-cards,
+  .threatlens-metrics,
   .batch-insights-grid,
   .confusion-matrix {
     grid-template-columns: 1fr;
