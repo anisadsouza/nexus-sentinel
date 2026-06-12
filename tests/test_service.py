@@ -86,6 +86,28 @@ class AnalysisServiceTests(unittest.TestCase):
             self.assertEqual(similar_groups[0]["example_urls"][0], saved.url)
             self.assertIn("prediction_probability", second_service._records[0].ml_analysis)
 
+    def test_threatlens_summary_rolls_up_saved_history(self) -> None:
+        service = AnalysisService()
+
+        service.analyze(
+            "http://secure-login.example.com.verify-account.test/reset"
+            "?user=1&a=2&b=3&c=4&d=5"
+        )
+        service.analyze("https://example.com")
+
+        summary = service.threatlens_summary()
+
+        self.assertIn("overview", summary)
+        self.assertIn("classification_breakdown", summary)
+        self.assertIn("top_similar_groups", summary)
+        self.assertIn("top_risk_signals", summary)
+        self.assertIn("top_themes", summary)
+        self.assertIn("daily_trend", summary)
+        self.assertIn("trend_change", summary)
+        self.assertIn("generated_summary", summary)
+        self.assertEqual(summary["overview"]["total_scans"], 2)
+        self.assertTrue(summary["daily_trend"])
+
 
 if __name__ == "__main__":
     unittest.main()
