@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections import Counter
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -87,6 +88,55 @@ class AnalysisService:
                 {record.similar_group_id for record in self._records}
             ),
             "highest_risk": max(risk_scores, default=0),
+        }
+
+    def threatlens_summary(self) -> dict[str, object]:
+        similar_groups = self.list_similar_groups()
+        classification_breakdown = Counter(
+            record.classification for record in self._records
+        )
+        theme_breakdown = Counter(_infer_theme(record) for record in self._records)
+        top_signal_counts = Counter()
+
+        for record in self._records:
+            top_reason = next(iter(record.risk_factors), None)
+            if top_reason:
+                top_signal_counts[top_reason] += 1
+
+        top_theme = (
+            theme_breakdown.most_common(1)[0][0] if theme_breakdown else "None yet"
+        )
+        top_signal = (
+            _humanize_signal_label(top_signal_counts.most_common(1)[0][0])
+            if top_signal_counts
+            else "No repeated warning signs yet"
+        )
+
+        return {
+            "overview": self.overview(),
+            "classification_breakdown": {
+                "safe": classification_breakdown.get("safe", 0),
+                "suspicious": classification_breakdown.get("suspicious", 0),
+                "phishing": classification_breakdown.get("phishing", 0),
+            },
+            "top_similar_groups": similar_groups[:5],
+            "top_risk_signals": [
+                {"label": _humanize_signal_label(label), "count": count}
+                for label, count in top_signal_counts.most_common(5)
+            ],
+            "top_themes": [
+                {"label": label, "count": count}
+                for label, count in theme_breakdown.most_common(5)
+            ],
+            "daily_trend": _build_daily_trend(self._records),
+            "trend_change": _build_trend_change(self._records),
+            "generated_summary": _build_generated_summary(
+                total_scans=len(self._records),
+                phishing_count=classification_breakdown.get("phishing", 0),
+                top_theme=top_theme,
+                top_signal=top_signal,
+                top_groups=similar_groups[:3],
+            ),
         }
 
     def _load_records(self) -> list[AnalysisRecord]:
@@ -267,3 +317,124 @@ def _grouping_reason(similar_group: dict[str, object]) -> str:
     if shared_traits:
         return "These links share the same suspicious pattern and repeated warning signs."
     return "These links share the same suspicious pattern."
+
+
+def _infer_theme(record: AnalysisRecord) -> str:
+    content = record.content_analysis
+    features = record.extracted_features
+    keywords = {
+        str(keyword).lower() for keyword in features.get("suspicious_keywords", ())
+    }
+    page_title = str(content.get("page_title", "")).lower()
+    notes = str(content.get("notes", "")).lower()
+    brand_words = {
+        str(keyword).lower()
+        for keyword in content.get("brand_keywords_detected", ())
+    }
+    combined_words = keywords | brand_words
+
+    if {"bank", "banking", "card", "payment", "paypal"} & combined_words:
+        return "Banking and payment"
+    if {"verify", "verification", "account", "secure"} & combined_words:
+        return "Account verification"
+    if content.get("password_field_detected") or content.get("login_form_detected"):
+        return "Credential theft"
+    if {"instagram", "facebook", "social", "twitter", "x"} & combined_words:
+        return "Social media impersonation"
+    if "invoice" in page_title or "payment" in notes:
+        return "Billing lure"
+    return "General phishing"
+
+
+def _build_daily_trend(records: list[AnalysisRecord]) -> list[dict[str, object]]:
+    daily: dict[str, dict[str, int]] = {}
+
+    for record in records:
+        date_key = record.analyzed_at[:10]
+        bucket = daily.setdefault(
+            date_key,
+            {"safe": 0, "suspicious": 0, "phishing": 0},
+        )
+        bucket[record.classification] = bucket.get(record.classification, 0) + 1
+
+    trend = [
+        {
+            "date": date_key,
+            "safe": counts.get("safe", 0),
+            "suspicious": counts.get("suspicious", 0),
+            "phishing": counts.get("phishing", 0),
+            "total": sum(counts.values()),
+        }
+        for date_key, counts in sorted(daily.items())
+    ]
+    return trend[-7:]
+
+
+def _build_generated_summary(
+    total_scans: int,
+    phishing_count: int,
+    top_theme: str,
+    top_signal: str,
+    top_groups: list[dict[str, object]],
+) -> str:
+    if total_scans == 0:
+        return (
+            "ThreatLens is ready. Save a few analyzed links and it will start surfacing "
+            "shared patterns, repeated scams, and activity trends."
+        )
+
+    phishing_pct = round((phishing_count / total_scans) * 100) if total_scans else 0
+    largest_group = top_groups[0]["size"] if top_groups else 0
+
+    return (
+        f"{phishing_pct}% of saved scans were classified as phishing. "
+        f"The most common theme so far is {top_theme.lower()}, and the most repeated warning sign "
+        f"is {top_signal.lower()}. "
+        f"The largest related threat group currently contains {largest_group} link"
+        f"{'' if largest_group == 1 else 's'}."
+    )
+
+
+def _humanize_signal_label(label: str) -> str:
+    return label.replace("_", " ").strip().capitalize()
+
+
+def _build_trend_change(records: list[AnalysisRecord]) -> dict[str, object]:
+    if not records:
+        return {
+            "recent_total": 0,
+            "previous_total": 0,
+            "change_pct": 0,
+            "direction": "steady",
+            "label": "No saved trend yet",
+        }
+
+    ordered = sorted(records, key=lambda record: record.analyzed_at)
+    midpoint = max(1, len(ordered) // 2)
+    previous = ordered[:midpoint]
+    recent = ordered[midpoint:]
+    previous_total = len(previous)
+    recent_total = len(recent)
+
+    if previous_total == 0:
+        change_pct = 100 if recent_total else 0
+    else:
+        change_pct = round(((recent_total - previous_total) / previous_total) * 100)
+
+    if change_pct > 0:
+        direction = "up"
+        label = f"Up {change_pct}% from the earlier window"
+    elif change_pct < 0:
+        direction = "down"
+        label = f"Down {abs(change_pct)}% from the earlier window"
+    else:
+        direction = "steady"
+        label = "Holding steady across saved scans"
+
+    return {
+        "recent_total": recent_total,
+        "previous_total": previous_total,
+        "change_pct": change_pct,
+        "direction": direction,
+        "label": label,
+    }

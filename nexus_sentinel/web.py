@@ -61,6 +61,12 @@ class DashboardApp:
                     "overview": self._service.overview(),
                 },
             )
+        if path == "/api/threatlens":
+            return self._json_response(
+                start_response,
+                200,
+                {"threatlens": self._service.threatlens_summary()},
+            )
         if path == "/api/model-report":
             return self._json_response(
                 start_response,
