@@ -20,6 +20,7 @@ let currentBatchData = null;
 let currentSingleResult = null;
 let batchFilterValue = "all";
 let batchSortValue = "score_desc";
+let currentThreatLensRange = "all";
 
 applyTheme(loadThemePreference());
 loadModelReport();
@@ -461,7 +462,7 @@ async function loadThreatLens() {
   threatLensPanel.innerHTML = '<p class="muted">Loading ThreatLens...</p>';
 
   try {
-    const response = await fetch("/api/threatlens");
+    const response = await fetch(`/api/threatlens?range=${encodeURIComponent(currentThreatLensRange)}`);
     const data = await response.json();
 
     if (!response.ok) {
@@ -469,6 +470,7 @@ async function loadThreatLens() {
     }
 
     threatLensPanel.innerHTML = buildThreatLensPanel(data.threatlens || {});
+    bindThreatLensControls();
   } catch (error) {
     threatLensPanel.innerHTML = `
       <div class="result-card">
@@ -484,50 +486,95 @@ function buildThreatLensPanel(summary) {
   const overview = summary.overview || {};
   const classifications = summary.classification_breakdown || {};
   const topTheme = firstThreatLensLabel(summary.top_themes, "No theme yet");
+  const topCategory = firstThreatLensLabel(summary.top_categories, "No category yet");
   const topGroups = Array.isArray(summary.top_similar_groups) ? summary.top_similar_groups : [];
+  const themeGroups = Array.isArray(summary.theme_groups) ? summary.theme_groups : [];
   const trend = Array.isArray(summary.daily_trend) ? summary.daily_trend : [];
   const trendChange = summary.trend_change || {};
+  const rangeLabel = summary.range_label || "All saved activity";
 
   return `
     <div class="threatlens-shell">
       <div class="result-card threatlens-summary-card">
-        <p class="section-kicker">ThreatLens Summary</p>
-        <p class="threatlens-summary-copy">${summary.generated_summary || "ThreatLens will summarize saved results here."}</p>
+        <div class="threatlens-summary-head">
+          <div>
+            <p class="section-kicker">ThreatLens Summary</p>
+            <p class="threatlens-summary-copy">${summary.generated_summary || "ThreatLens will summarize saved results here."}</p>
+          </div>
+          <div class="threatlens-actions">
+            <label class="batch-control threatlens-range-control">
+              <span>Window</span>
+              <select id="threatlens-range">
+                <option value="all">All saved activity</option>
+                <option value="30">Last 30 days</option>
+                <option value="7">Last 7 days</option>
+              </select>
+            </label>
+            <a class="report-link" href="/api/threatlens/download?range=${encodeURIComponent(currentThreatLensRange)}">Download ThreatLens report</a>
+          </div>
+        </div>
         <p class="helper-copy threatlens-helper">
-          This view reads saved scan history. Private one-off checks stay out of it.
+          This view reads saved scan history. Private one-off checks stay out of it. Current window: ${rangeLabel}.
         </p>
       </div>
 
       <div class="threatlens-metrics">
         ${buildThreatLensMetric("Saved scans", overview.total_scans || 0, "Saved analysis records")}
         ${buildThreatLensMetric("Likely phishing", classifications.phishing || 0, "High-risk results in history")}
-        ${buildThreatLensMetric("Top theme", topTheme, "Most repeated phishing theme")}
+        ${buildThreatLensMetric("Top category", topCategory, "Highest-level threat category")}
         ${buildThreatLensMetric("Activity trend", trendChange.label || "No saved trend yet", "Compared with the earlier saved window")}
       </div>
 
       <div class="result-grid result-grid-secondary">
         <section class="result-card">
-          <p class="section-kicker">Top Threat Groups</p>
-          ${buildThreatLensGroups(topGroups)}
+          <p class="section-kicker">Weekly Briefing</p>
+          <p class="threatlens-briefing">${summary.weekly_briefing || "ThreatLens will generate a weekly-style summary here once saved results build up."}</p>
+          <div class="dataset-name-list">
+            ${buildThreatLensPills(summary.top_categories)}
+          </div>
         </section>
         <section class="result-card">
-          <p class="section-kicker">Threat Trend</p>
-          ${buildThreatLensTrend(trend)}
+          <p class="section-kicker">Top Threat Groups</p>
+          ${buildThreatLensGroups(topGroups)}
         </section>
       </div>
 
       <div class="result-grid result-grid-secondary">
         <section class="result-card">
-          <p class="section-kicker">Threat Themes</p>
-          ${buildThreatLensCountList(summary.top_themes, "No saved themes yet.")}
+          <p class="section-kicker">Threat Trend</p>
+          ${buildThreatLensTrendChart(trend)}
         </section>
+        <section class="result-card">
+          <p class="section-kicker">Theme Groups</p>
+          ${buildThreatLensThemeGroups(themeGroups)}
+        </section>
+      </div>
+
+      <div class="result-grid result-grid-secondary">
         <section class="result-card">
           <p class="section-kicker">Repeated Warning Signs</p>
           ${buildThreatLensCountList(summary.top_risk_signals, "No repeated warning signs yet.")}
         </section>
+        <section class="result-card">
+          <p class="section-kicker">Common Risk Insights</p>
+          ${buildThreatLensInsightList(summary.top_risk_insights, "No shared risk insights yet.")}
+        </section>
       </div>
     </div>
   `;
+}
+
+function bindThreatLensControls() {
+  const rangeSelect = document.getElementById("threatlens-range");
+  if (!rangeSelect) {
+    return;
+  }
+
+  rangeSelect.value = currentThreatLensRange;
+  rangeSelect.addEventListener("change", () => {
+    currentThreatLensRange = rangeSelect.value;
+    loadThreatLens();
+  });
 }
 
 function buildThreatLensMetric(label, value, copy) {
@@ -554,6 +601,10 @@ function buildThreatLensGroups(groups) {
             <div class="candidate-model-row threatlens-group-row">
               <div>
                 <p class="factor-title">${group.size} related link${group.size === 1 ? "" : "s"} · ${sentenceCase(group.classification)}</p>
+                <div class="dataset-name-list threatlens-chip-list">
+                  <span class="meta-pill">${group.category || "General phishing"}</span>
+                  <span class="meta-pill">${group.theme || "General phishing"}</span>
+                </div>
                 <p class="factor-impact">${group.grouping_reason}</p>
                 <p class="threatlens-inline-meta">
                   First seen ${formatShortDate(group.first_seen)} · Latest seen ${formatShortDate(group.latest_seen)}
@@ -567,20 +618,58 @@ function buildThreatLensGroups(groups) {
   `;
 }
 
-function buildThreatLensTrend(trend) {
+function buildThreatLensThemeGroups(items) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return '<p class="factor-impact">No saved theme groups yet.</p>';
+  }
+
+  return `
+    <div class="factor-list">
+      ${rows
+        .map(
+          (item) => `
+            <div class="candidate-model-row threatlens-theme-row">
+              <div class="threatlens-trend-row-head">
+                <p class="factor-title">${item.label}</p>
+                <p class="threatlens-inline-meta">${item.count} total</p>
+              </div>
+              <div class="threatlens-bar-track">
+                <div class="threatlens-bar-fill" style="width: ${Math.max(8, Math.min(item.count * 18, 100))}%"></div>
+              </div>
+              <p class="factor-impact">
+                ${item.phishing} phishing · ${item.suspicious} suspicious · ${item.safe} safe
+              </p>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function buildThreatLensTrendChart(trend) {
   const items = Array.isArray(trend) ? trend : [];
   if (!items.length) {
     return '<p class="factor-impact">No saved scan history yet for trend analysis.</p>';
   }
 
+  const maxTotal = Math.max(...items.map((item) => Number(item.total || 0)), 1);
+
   return `
-    <div class="factor-list">
+    <div class="factor-list threatlens-trend-list">
       ${items
         .map(
           (item) => `
             <div class="candidate-model-row threatlens-trend-row">
+              <div class="threatlens-trend-row-head">
+                <p class="factor-title">${formatShortDate(item.date)}</p>
+                <p class="threatlens-inline-meta">${item.total} total</p>
+              </div>
+              <div class="threatlens-bar-track">
+                <div class="threatlens-bar-fill" style="width: ${Math.max(8, Math.round((Number(item.total || 0) / maxTotal) * 100))}%"></div>
+              </div>
               <div>
-                <p class="factor-title">${formatShortDate(item.date)} · ${item.total} total</p>
                 <p class="factor-impact">
                   ${item.phishing} phishing · ${item.suspicious} suspicious · ${item.safe} safe
                 </p>
@@ -618,11 +707,50 @@ function buildThreatLensCountList(items, emptyCopy) {
   `;
 }
 
+function buildThreatLensInsightList(items, emptyCopy) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return `<p class="factor-impact">${emptyCopy}</p>`;
+  }
+
+  return `
+    <div class="factor-list">
+      ${rows
+        .map(
+          (item) => `
+            <div class="factor-row">
+              <span class="factor-icon factor-bad">!</span>
+              <div class="factor-copy">
+                <p class="factor-title">${item.label}</p>
+                <div class="threatlens-inline-bar">
+                  <div class="threatlens-inline-bar-fill" style="width: ${Math.max(12, Math.min(item.count * 12, 100))}%"></div>
+                </div>
+                <p class="factor-impact">${item.count} saved link${item.count === 1 ? "" : "s"} showed this pattern</p>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
 function firstThreatLensLabel(items, fallback) {
   if (!Array.isArray(items) || !items.length) {
     return fallback;
   }
   return items[0].label || fallback;
+}
+
+function buildThreatLensPills(items) {
+  const rows = Array.isArray(items) ? items.slice(0, 4) : [];
+  if (!rows.length) {
+    return "";
+  }
+
+  return rows
+    .map((item) => `<span class="meta-pill">${item.label}</span>`)
+    .join("");
 }
 
 function setAnalyzeButtonState(isLoading) {
