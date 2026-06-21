@@ -70,50 +70,70 @@ class AnalysisService:
 
         return results
 
-    def list_similar_groups(self) -> list[dict[str, object]]:
+    def list_similar_groups(
+        self, records: list[AnalysisRecord] | None = None
+    ) -> list[dict[str, object]]:
+        working_records = self._records if records is None else records
         groups = [
             _build_similar_group_summary(records)
-            for _group_id, records in _group_records_by_id(self._records).items()
+            for _group_id, records in _group_records_by_id(working_records).items()
         ]
         return sorted(
             groups,
             key=lambda group: (-int(group["size"]), str(group["similar_group_id"])),
         )
 
-    def overview(self) -> dict[str, int]:
-        risk_scores = [record.risk_score for record in self._records]
+    def overview(self, records: list[AnalysisRecord] | None = None) -> dict[str, int]:
+        working_records = self._records if records is None else records
+        risk_scores = [record.risk_score for record in working_records]
         return {
-            "total_scans": len(self._records),
+            "total_scans": len(working_records),
             "active_similar_groups": len(
-                {record.similar_group_id for record in self._records}
+                {record.similar_group_id for record in working_records}
             ),
             "highest_risk": max(risk_scores, default=0),
         }
 
-    def threatlens_summary(self) -> dict[str, object]:
-        similar_groups = self.list_similar_groups()
+    def threatlens_summary(self, days: int | None = None) -> dict[str, object]:
+        filtered_records = _filter_records_by_days(self._records, days)
+        similar_groups = self.list_similar_groups(filtered_records)
         classification_breakdown = Counter(
-            record.classification for record in self._records
+            record.classification for record in filtered_records
         )
-        theme_breakdown = Counter(_infer_theme(record) for record in self._records)
+        theme_breakdown = Counter(_infer_theme(record) for record in filtered_records)
+        category_breakdown = Counter(
+            _infer_category(record) for record in filtered_records
+        )
         top_signal_counts = Counter()
+        risk_insight_counts = Counter()
 
-        for record in self._records:
+        for record in filtered_records:
             top_reason = next(iter(record.risk_factors), None)
             if top_reason:
                 top_signal_counts[top_reason] += 1
+            for label in _extract_risk_insights(record):
+                risk_insight_counts[label] += 1
 
         top_theme = (
             theme_breakdown.most_common(1)[0][0] if theme_breakdown else "None yet"
+        )
+        top_category = (
+            category_breakdown.most_common(1)[0][0]
+            if category_breakdown
+            else "No category yet"
         )
         top_signal = (
             _humanize_signal_label(top_signal_counts.most_common(1)[0][0])
             if top_signal_counts
             else "No repeated warning signs yet"
         )
+        trend = _build_daily_trend(filtered_records)
+        trend_change = _build_trend_change(filtered_records)
 
         return {
-            "overview": self.overview(),
+            "overview": self.overview(filtered_records),
+            "range_days": days,
+            "range_label": _range_label(days),
             "classification_breakdown": {
                 "safe": classification_breakdown.get("safe", 0),
                 "suspicious": classification_breakdown.get("suspicious", 0),
@@ -128,10 +148,27 @@ class AnalysisService:
                 {"label": label, "count": count}
                 for label, count in theme_breakdown.most_common(5)
             ],
-            "daily_trend": _build_daily_trend(self._records),
-            "trend_change": _build_trend_change(self._records),
+            "top_categories": [
+                {"label": label, "count": count}
+                for label, count in category_breakdown.most_common(5)
+            ],
+            "theme_groups": _build_theme_groups(filtered_records),
+            "top_risk_insights": [
+                {"label": label, "count": count}
+                for label, count in risk_insight_counts.most_common(6)
+            ],
+            "daily_trend": trend,
+            "trend_change": trend_change,
+            "weekly_briefing": _build_weekly_briefing(
+                total_scans=len(filtered_records),
+                phishing_count=classification_breakdown.get("phishing", 0),
+                top_category=top_category,
+                top_theme=top_theme,
+                trend_change=trend_change,
+                top_groups=similar_groups[:3],
+            ),
             "generated_summary": _build_generated_summary(
-                total_scans=len(self._records),
+                total_scans=len(filtered_records),
                 phishing_count=classification_breakdown.get("phishing", 0),
                 top_theme=top_theme,
                 top_signal=top_signal,
@@ -265,6 +302,8 @@ def _build_similar_group_summary(
     summary = {
         "similar_group_id": first_record.similar_group_id,
         "classification": first_record.classification,
+        "theme": _majority_label(records, _infer_theme),
+        "category": _majority_label(records, _infer_category),
         "size": len(records),
         "example_urls": [record.url for record in records[:3]],
         "common_risk_factors": [
@@ -346,6 +385,49 @@ def _infer_theme(record: AnalysisRecord) -> str:
     return "General phishing"
 
 
+def _infer_category(record: AnalysisRecord) -> str:
+    theme = _infer_theme(record)
+    if theme == "Banking and payment":
+        return "Financial targeting"
+    if theme == "Account verification":
+        return "Account takeover"
+    if theme == "Credential theft":
+        return "Credential theft"
+    if theme == "Social media impersonation":
+        return "Brand impersonation"
+    if theme == "Billing lure":
+        return "Payment pressure"
+    return "General phishing"
+
+
+def _extract_risk_insights(record: AnalysisRecord) -> list[str]:
+    insights: list[str] = []
+    features = record.extracted_features
+    content = record.content_analysis
+    redirect = record.redirect_analysis
+
+    if features.get("uses_https") is False:
+        insights.append("No HTTPS")
+    if features.get("has_suspicious_tld") is True:
+        insights.append("Unusual website ending")
+    if features.get("is_ip_hostname") is True:
+        insights.append("IP-based host")
+    if content.get("login_form_detected") or content.get("password_field_detected"):
+        insights.append("Credential collection page")
+    if content.get("urgency_language_detected"):
+        insights.append("Urgency wording")
+    if content.get("brand_impersonation_clues_detected"):
+        insights.append("Brand mismatch clues")
+    if content.get("form_action_external_detected"):
+        insights.append("External form destination")
+    if redirect.get("cross_domain_redirect_detected"):
+        insights.append("Cross-site redirect")
+    if redirect.get("downgrade_to_http_detected"):
+        insights.append("HTTPS downgrade")
+
+    return insights
+
+
 def _build_daily_trend(records: list[AnalysisRecord]) -> list[dict[str, object]]:
     daily: dict[str, dict[str, int]] = {}
 
@@ -368,6 +450,31 @@ def _build_daily_trend(records: list[AnalysisRecord]) -> list[dict[str, object]]
         for date_key, counts in sorted(daily.items())
     ]
     return trend[-7:]
+
+
+def _build_theme_groups(records: list[AnalysisRecord]) -> list[dict[str, object]]:
+    theme_counts: dict[str, dict[str, int]] = {}
+
+    for record in records:
+        theme = _infer_theme(record)
+        bucket = theme_counts.setdefault(
+            theme,
+            {"count": 0, "phishing": 0, "suspicious": 0, "safe": 0},
+        )
+        bucket["count"] += 1
+        bucket[record.classification] += 1
+
+    items = [
+        {
+            "label": theme,
+            "count": counts["count"],
+            "phishing": counts["phishing"],
+            "suspicious": counts["suspicious"],
+            "safe": counts["safe"],
+        }
+        for theme, counts in theme_counts.items()
+    ]
+    return sorted(items, key=lambda item: (-int(item["count"]), str(item["label"])))[:5]
 
 
 def _build_generated_summary(
@@ -395,8 +502,76 @@ def _build_generated_summary(
     )
 
 
+def _build_weekly_briefing(
+    total_scans: int,
+    phishing_count: int,
+    top_category: str,
+    top_theme: str,
+    trend_change: dict[str, object],
+    top_groups: list[dict[str, object]],
+) -> str:
+    if total_scans == 0:
+        return (
+            "No saved activity yet. Once results are stored, ThreatLens will turn them into a short "
+            "intelligence briefing with themes, shifts, and the biggest repeated groups."
+        )
+
+    largest_group = top_groups[0]["size"] if top_groups else 0
+    direction_label = str(trend_change.get("label", "Holding steady across saved scans")).lower()
+
+    return (
+        f"Saved activity is centered on {top_category.lower()}, with {top_theme.lower()} as the leading theme. "
+        f"{phishing_count} of {total_scans} saved scans are currently phishing, {direction_label}, "
+        f"and the largest repeated group contains {largest_group} related link"
+        f"{'' if largest_group == 1 else 's'}."
+    )
+
+
 def _humanize_signal_label(label: str) -> str:
     return label.replace("_", " ").strip().capitalize()
+
+
+def _majority_label(
+    records: list[AnalysisRecord],
+    resolver: Callable[[AnalysisRecord], str],
+) -> str:
+    counts = Counter(resolver(record) for record in records)
+    return counts.most_common(1)[0][0] if counts else "Unknown"
+
+
+def _range_label(days: int | None) -> str:
+    if days is None:
+        return "All saved activity"
+    if days == 7:
+        return "Last 7 days"
+    if days == 30:
+        return "Last 30 days"
+    return f"Last {days} days"
+
+
+def _filter_records_by_days(
+    records: list[AnalysisRecord],
+    days: int | None,
+) -> list[AnalysisRecord]:
+    if days is None:
+        return list(records)
+
+    cutoff_seconds = max(0, days) * 24 * 60 * 60
+    now = datetime.now(timezone.utc)
+    filtered: list[AnalysisRecord] = []
+
+    for record in records:
+        try:
+            analyzed_at = datetime.fromisoformat(record.analyzed_at)
+        except ValueError:
+            continue
+        if analyzed_at.tzinfo is None:
+            analyzed_at = analyzed_at.replace(tzinfo=timezone.utc)
+        age_seconds = (now - analyzed_at).total_seconds()
+        if age_seconds <= cutoff_seconds:
+            filtered.append(record)
+
+    return filtered
 
 
 def _build_trend_change(records: list[AnalysisRecord]) -> dict[str, object]:
