@@ -848,6 +848,17 @@ button:disabled {
   margin: 6px 0 8px;
 }
 
+.threatlens-spotlight-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.threatlens-spotlight-card {
+  display: grid;
+  gap: 8px;
+}
+
 .threatlens-trend-list {
   gap: 10px;
 }
@@ -878,6 +889,11 @@ button:disabled {
   height: 100%;
   border-radius: 999px;
   background: var(--accent);
+}
+
+.threatlens-share-row {
+  display: grid;
+  gap: 8px;
 }
 
 .batch-insight-card {
@@ -1266,6 +1282,10 @@ button:disabled {
 
   .threatlens-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .threatlens-spotlight-grid {
+    grid-template-columns: 1fr;
   }
 
   .batch-insights-grid {
