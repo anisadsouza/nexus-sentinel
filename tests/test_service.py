@@ -1,6 +1,7 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from nexus_sentinel.service import AnalysisService
 
@@ -102,11 +103,31 @@ class AnalysisServiceTests(unittest.TestCase):
         self.assertIn("top_similar_groups", summary)
         self.assertIn("top_risk_signals", summary)
         self.assertIn("top_themes", summary)
+        self.assertIn("top_categories", summary)
+        self.assertIn("top_risk_insights", summary)
         self.assertIn("daily_trend", summary)
         self.assertIn("trend_change", summary)
+        self.assertIn("weekly_briefing", summary)
         self.assertIn("generated_summary", summary)
         self.assertEqual(summary["overview"]["total_scans"], 2)
         self.assertTrue(summary["daily_trend"])
+
+    def test_threatlens_summary_can_filter_by_recent_days(self) -> None:
+        service = AnalysisService()
+
+        with patch("nexus_sentinel.service._timestamp_now", side_effect=[
+            "2026-06-01T00:00:00+00:00",
+            "2026-06-21T00:00:00+00:00",
+        ]):
+            service.analyze("http://192.168.1.5/login")
+            service.analyze("https://example.com")
+
+        summary = service.threatlens_summary(days=7)
+
+        self.assertEqual(summary["range_days"], 7)
+        self.assertEqual(summary["overview"]["total_scans"], 1)
+        self.assertEqual(summary["range_label"], "Last 7 days")
+        self.assertIn("theme_groups", summary)
 
 
 if __name__ == "__main__":
