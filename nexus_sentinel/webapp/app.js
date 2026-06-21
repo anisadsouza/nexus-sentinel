@@ -489,6 +489,9 @@ function buildThreatLensPanel(summary) {
   const topCategory = firstThreatLensLabel(summary.top_categories, "No category yet");
   const topGroups = Array.isArray(summary.top_similar_groups) ? summary.top_similar_groups : [];
   const themeGroups = Array.isArray(summary.theme_groups) ? summary.theme_groups : [];
+  const classificationShares = Array.isArray(summary.classification_shares) ? summary.classification_shares : [];
+  const topBrandTargets = Array.isArray(summary.top_brand_targets) ? summary.top_brand_targets : [];
+  const campaignSpotlights = Array.isArray(summary.campaign_spotlights) ? summary.campaign_spotlights : [];
   const trend = Array.isArray(summary.daily_trend) ? summary.daily_trend : [];
   const trendChange = summary.trend_change || {};
   const rangeLabel = summary.range_label || "All saved activity";
@@ -534,6 +537,17 @@ function buildThreatLensPanel(summary) {
           </div>
         </section>
         <section class="result-card">
+          <p class="section-kicker">Current Share</p>
+          ${buildThreatLensShareList(classificationShares)}
+        </section>
+      </div>
+
+      <div class="result-grid result-grid-secondary">
+        <section class="result-card">
+          <p class="section-kicker">Campaign Spotlights</p>
+          ${buildThreatLensSpotlights(campaignSpotlights)}
+        </section>
+        <section class="result-card">
           <p class="section-kicker">Top Threat Groups</p>
           ${buildThreatLensGroups(topGroups)}
         </section>
@@ -556,8 +570,19 @@ function buildThreatLensPanel(summary) {
           ${buildThreatLensCountList(summary.top_risk_signals, "No repeated warning signs yet.")}
         </section>
         <section class="result-card">
+          <p class="section-kicker">Top Target Brands</p>
+          ${buildThreatLensCountList(topBrandTargets, "No brand targets were detected in this window.")}
+        </section>
+      </div>
+
+      <div class="result-grid result-grid-secondary">
+        <section class="result-card">
           <p class="section-kicker">Common Risk Insights</p>
           ${buildThreatLensInsightList(summary.top_risk_insights, "No shared risk insights yet.")}
+        </section>
+        <section class="result-card">
+          <p class="section-kicker">How to read this</p>
+          <p class="factor-impact">ThreatLens keeps this section focused on the patterns that repeat most often in the selected window. It is meant to show what is recurring, not everything that was ever seen.</p>
         </section>
       </div>
     </div>
@@ -584,6 +609,62 @@ function buildThreatLensMetric(label, value, copy) {
       <p class="batch-summary-value">${value}</p>
       <p class="factor-impact">${copy}</p>
     </article>
+  `;
+}
+
+function buildThreatLensShareList(items) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return '<p class="factor-impact">No saved share data yet.</p>';
+  }
+
+  return `
+    <div class="factor-list">
+      ${rows
+        .map(
+          (item) => `
+            <div class="candidate-model-row threatlens-share-row">
+              <div class="threatlens-trend-row-head">
+                <p class="factor-title">${item.label}</p>
+                <p class="threatlens-inline-meta">${item.count} · ${item.pct}%</p>
+              </div>
+              <div class="threatlens-bar-track">
+                <div class="threatlens-bar-fill" style="width: ${Math.max(8, item.pct)}%"></div>
+              </div>
+            </div>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function buildThreatLensSpotlights(items) {
+  const rows = Array.isArray(items) ? items : [];
+  if (!rows.length) {
+    return '<p class="factor-impact">No campaign spotlights yet. Save more scans and ThreatLens will highlight the strongest repeated groups here.</p>';
+  }
+
+  return `
+    <div class="threatlens-spotlight-grid">
+      ${rows
+        .map(
+          (item) => `
+            <article class="batch-summary-card threatlens-spotlight-card">
+              <p class="section-kicker">Spotlight</p>
+              <p class="factor-title">${item.headline}</p>
+              <p class="batch-insight-value">${item.size} related link${item.size === 1 ? "" : "s"}</p>
+              <p class="factor-impact">${item.grouping_reason}</p>
+              <div class="dataset-name-list threatlens-chip-list">
+                <span class="meta-pill">${sentenceCase(item.classification)}</span>
+                <span class="meta-pill">${item.top_signal}</span>
+              </div>
+              <p class="example-url">${item.example_url || ""}</p>
+            </article>
+          `
+        )
+        .join("")}
+    </div>
   `;
 }
 
