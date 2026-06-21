@@ -62,10 +62,19 @@ class DashboardApp:
                 },
             )
         if path == "/api/threatlens":
+            query = parse_qs(environ.get("QUERY_STRING", ""))
             return self._json_response(
                 start_response,
                 200,
-                {"threatlens": self._service.threatlens_summary()},
+                {"threatlens": self._service.threatlens_summary(_parse_range_days(query))},
+            )
+        if path == "/api/threatlens/download":
+            query = parse_qs(environ.get("QUERY_STRING", ""))
+            return self._json_download_response(
+                start_response,
+                200,
+                {"threatlens": self._service.threatlens_summary(_parse_range_days(query))},
+                filename="nexus-sentinel-threatlens-report.json",
             )
         if path == "/api/model-report":
             return self._json_response(
@@ -275,6 +284,15 @@ def _extract_urls_from_csv_text(csv_text: str) -> list[str]:
         raise ValueError("No valid URLs were found in the CSV file.")
 
     return urls
+
+
+def _parse_range_days(query: dict[str, list[str]]) -> int | None:
+    raw_value = (query.get("range") or ["all"])[0].strip().lower()
+    if raw_value in {"", "all"}:
+        return None
+    if raw_value not in {"7", "30"}:
+        return None
+    return int(raw_value)
 
 
 if __name__ == "__main__":
