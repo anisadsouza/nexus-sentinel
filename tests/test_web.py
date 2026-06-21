@@ -179,7 +179,10 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("top_similar_groups", payload["threatlens"])
         self.assertIn("trend_change", payload["threatlens"])
         self.assertIn("top_categories", payload["threatlens"])
+        self.assertIn("classification_shares", payload["threatlens"])
+        self.assertIn("top_brand_targets", payload["threatlens"])
         self.assertIn("theme_groups", payload["threatlens"])
+        self.assertIn("campaign_spotlights", payload["threatlens"])
         self.assertIn("weekly_briefing", payload["threatlens"])
         self.assertIn("generated_summary", payload["threatlens"])
 
