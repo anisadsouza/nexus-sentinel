@@ -178,7 +178,43 @@ class DashboardAppTests(unittest.TestCase):
         self.assertIn("classification_breakdown", payload["threatlens"])
         self.assertIn("top_similar_groups", payload["threatlens"])
         self.assertIn("trend_change", payload["threatlens"])
+        self.assertIn("top_categories", payload["threatlens"])
+        self.assertIn("theme_groups", payload["threatlens"])
+        self.assertIn("weekly_briefing", payload["threatlens"])
         self.assertIn("generated_summary", payload["threatlens"])
+
+    def test_threatlens_endpoint_accepts_range_filter(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+            _run_app(
+                app,
+                path="/api/analyze",
+                query_string="url=https%3A%2F%2Fexample.com&private=0",
+            )
+
+            status, headers, body = _run_app(
+                app,
+                path="/api/threatlens",
+                query_string="range=7",
+            )
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        payload = json.loads(body)
+        self.assertEqual(payload["threatlens"]["range_days"], 7)
+        self.assertEqual(payload["threatlens"]["range_label"], "Last 7 days")
+
+    def test_threatlens_download_endpoint_returns_attachment(self) -> None:
+        with TemporaryDirectory() as tmp_dir:
+            app = DashboardApp(storage_path=f"{tmp_dir}/history.json")
+
+            status, headers, body = _run_app(app, path="/api/threatlens/download")
+
+        self.assertEqual(status, "200 OK")
+        self.assertEqual(headers["Content-Type"], "application/json")
+        self.assertIn("attachment;", headers["Content-Disposition"])
+        payload = json.loads(body)
+        self.assertIn("threatlens", payload)
 
     def test_model_report_download_endpoint_returns_attachment(self) -> None:
         app = DashboardApp()
