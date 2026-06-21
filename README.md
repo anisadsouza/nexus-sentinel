@@ -8,6 +8,8 @@ The product focuses on three things:
 - explanations that a normal person can actually understand
 - a lightweight ML layer with SHAP-backed reasoning
 
+It now also includes **ThreatLens**, an intelligence layer that looks across saved scans and turns them into themes, trends, and grouped threat signals.
+
 It is still being built locally today, but the direction is toward a public web product later.
 
 ## Core Experience
@@ -56,6 +58,22 @@ The interface also includes:
 - safe example links for testing
 
 The goal is not just detection. It is to help someone understand why a link deserves caution.
+
+### ThreatLens
+
+ThreatLens sits on top of saved Nexus Sentinel results and answers a different question:
+
+- Nexus Sentinel: `Is this URL risky?`
+- ThreatLens: `What are all these saved results telling us together?`
+
+The current ThreatLens build includes:
+
+- grouped threat clusters
+- theme and category rollups
+- repeated warning-sign insights
+- short intelligence-style summaries
+- activity trend comparisons
+- downloadable ThreatLens JSON reports
 
 ## Detection Layers
 
@@ -171,6 +189,7 @@ NexusSentinel/
 - downloadable batch result CSV
 - downloadable single-result JSON
 - downloadable model report JSON
+- downloadable ThreatLens report JSON
 - theme toggle
 - test coverage for core flows
 
