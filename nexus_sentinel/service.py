@@ -104,6 +104,7 @@ class AnalysisService:
         category_breakdown = Counter(
             _infer_category(record) for record in filtered_records
         )
+        brand_breakdown = Counter()
         top_signal_counts = Counter()
         risk_insight_counts = Counter()
 
@@ -113,6 +114,8 @@ class AnalysisService:
                 top_signal_counts[top_reason] += 1
             for label in _extract_risk_insights(record):
                 risk_insight_counts[label] += 1
+            for label in _extract_brand_targets(record):
+                brand_breakdown[label] += 1
 
         top_theme = (
             theme_breakdown.most_common(1)[0][0] if theme_breakdown else "None yet"
@@ -152,11 +155,26 @@ class AnalysisService:
                 {"label": label, "count": count}
                 for label, count in category_breakdown.most_common(5)
             ],
+            "classification_shares": _build_share_rows(
+                classification_breakdown,
+                len(filtered_records),
+                order=("phishing", "suspicious", "safe"),
+                labels={
+                    "phishing": "Likely phishing",
+                    "suspicious": "Use caution",
+                    "safe": "Looks safe",
+                },
+            ),
             "theme_groups": _build_theme_groups(filtered_records),
+            "top_brand_targets": [
+                {"label": label, "count": count}
+                for label, count in brand_breakdown.most_common(5)
+            ],
             "top_risk_insights": [
                 {"label": label, "count": count}
                 for label, count in risk_insight_counts.most_common(6)
             ],
+            "campaign_spotlights": _build_campaign_spotlights(similar_groups[:3]),
             "daily_trend": trend,
             "trend_change": trend_change,
             "weekly_briefing": _build_weekly_briefing(
@@ -428,6 +446,16 @@ def _extract_risk_insights(record: AnalysisRecord) -> list[str]:
     return insights
 
 
+def _extract_brand_targets(record: AnalysisRecord) -> list[str]:
+    content = record.content_analysis
+    brands = [
+        str(keyword).strip().title()
+        for keyword in content.get("brand_keywords_detected", ())
+        if str(keyword).strip()
+    ]
+    return brands[:3]
+
+
 def _build_daily_trend(records: list[AnalysisRecord]) -> list[dict[str, object]]:
     daily: dict[str, dict[str, int]] = {}
 
@@ -475,6 +503,29 @@ def _build_theme_groups(records: list[AnalysisRecord]) -> list[dict[str, object]
         for theme, counts in theme_counts.items()
     ]
     return sorted(items, key=lambda item: (-int(item["count"]), str(item["label"])))[:5]
+
+
+def _build_campaign_spotlights(
+    similar_groups: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    spotlights: list[dict[str, object]] = []
+
+    for group in similar_groups[:3]:
+        category = str(group.get("category", "General phishing"))
+        theme = str(group.get("theme", "General phishing"))
+        factor = list(group.get("common_risk_factors", ()))
+        spotlights.append(
+            {
+                "headline": f"{category} · {theme}",
+                "size": int(group.get("size", 0)),
+                "classification": str(group.get("classification", "suspicious")),
+                "grouping_reason": str(group.get("grouping_reason", "")),
+                "top_signal": _humanize_signal_label(factor[0]) if factor else "Repeated suspicious pattern",
+                "example_url": next(iter(group.get("example_urls", ())), ""),
+            }
+        )
+
+    return spotlights
 
 
 def _build_generated_summary(
@@ -547,6 +598,27 @@ def _range_label(days: int | None) -> str:
     if days == 30:
         return "Last 30 days"
     return f"Last {days} days"
+
+
+def _build_share_rows(
+    counts: Counter[str],
+    total: int,
+    order: tuple[str, ...],
+    labels: dict[str, str],
+) -> list[dict[str, object]]:
+    rows: list[dict[str, object]] = []
+    for key in order:
+        count = counts.get(key, 0)
+        pct = round((count / total) * 100) if total else 0
+        rows.append(
+            {
+                "key": key,
+                "label": labels.get(key, key),
+                "count": count,
+                "pct": pct,
+            }
+        )
+    return rows
 
 
 def _filter_records_by_days(
