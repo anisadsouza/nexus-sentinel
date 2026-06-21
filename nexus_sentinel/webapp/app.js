@@ -1086,6 +1086,16 @@ function buildModelReportPanel(report) {
           <p class="fact-value">${formatThresholds(report.decision_thresholds)}</p>
         </div>
       </div>
+      <div class="model-health-grid">
+        ${buildModelHealthCard("Accuracy", formatMetric(evaluation.accuracy), "Held-out benchmark")}
+        ${buildModelHealthCard("F1 score", formatMetric(evaluation.f1_score), "Balanced quality signal")}
+        ${buildModelHealthCard("Datasets", report.dataset_count ?? 1, "Tracked local sources")}
+        ${buildModelHealthCard("Benchmark runs", report.history_count ?? 0, "Model history captured")}
+      </div>
+      <div class="compact-ml-note model-health-note">
+        <p class="factor-title">Strengthening over time</p>
+        <p class="factor-impact">${buildModelProgressNarrative(report, evaluation)}</p>
+      </div>
       ${buildEvaluationGrid(evaluation)}
 
       <details class="advanced-details model-report-details">
@@ -1118,6 +1128,28 @@ function buildModelReportPanel(report) {
       </details>
     </div>
   `;
+}
+
+function buildModelHealthCard(label, value, copy) {
+  return `
+    <article class="batch-summary-card model-health-card">
+      <p class="fact-label">${label}</p>
+      <p class="batch-summary-value">${value}</p>
+      <p class="factor-impact">${copy}</p>
+    </article>
+  `;
+}
+
+function buildModelProgressNarrative(report, evaluation) {
+  const datasetCount = report.dataset_count ?? 1;
+  const historyCount = report.history_count ?? 0;
+  const split = buildSplitLabel(
+    Number(evaluation.train_samples || 0),
+    Number(evaluation.test_samples || 0)
+  );
+  const trainedAt = formatTimestamp(report.trained_at);
+
+  return `The current model uses ${datasetCount} tracked dataset${datasetCount === 1 ? "" : "s"}, was last trained on ${trainedAt}, and keeps ${historyCount} benchmark snapshot${historyCount === 1 ? "" : "s"} for comparison. The current evaluation split is ${split}.`;
 }
 
 function humanizeMethod(method) {
