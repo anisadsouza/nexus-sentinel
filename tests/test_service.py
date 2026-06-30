@@ -120,7 +120,7 @@ class AnalysisServiceTests(unittest.TestCase):
 
         with patch("nexus_sentinel.service._timestamp_now", side_effect=[
             "2026-06-01T00:00:00+00:00",
-            "2026-06-21T00:00:00+00:00",
+            "2026-06-29T00:00:00+00:00",
         ]):
             service.analyze("http://192.168.1.5/login")
             service.analyze("https://example.com")

@@ -360,7 +360,7 @@ button:disabled {
 }
 
 .model-report-panel {
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .model-report-card {
@@ -416,6 +416,77 @@ button:disabled {
 .tips-layout {
   display: grid;
   gap: 16px;
+}
+
+.result-priority-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-strong);
+  margin-bottom: 16px;
+}
+
+.result-priority-score {
+  min-width: 132px;
+}
+
+.result-priority-value {
+  margin-bottom: 0;
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.result-priority-title {
+  margin-bottom: 6px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.result-priority-subtitle {
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: inherit;
+  opacity: 0.9;
+}
+
+.result-priority-meta {
+  margin-bottom: 0;
+  font-size: 13px;
+  color: inherit;
+  opacity: 0.75;
+  overflow-wrap: anywhere;
+}
+
+.result-priority-card.verdict-medium,
+.result-priority-card.verdict-high,
+.result-priority-card.verdict-safe {
+  background: color-mix(in srgb, var(--surface-raised) 74%, transparent);
+}
+
+.result-priority-card.verdict-medium .result-priority-value,
+.result-priority-card.verdict-medium .result-priority-title,
+.result-priority-card.verdict-medium .result-priority-subtitle,
+.result-priority-card.verdict-medium .result-priority-meta {
+  color: var(--amber-text);
+}
+
+.result-priority-card.verdict-high .result-priority-value,
+.result-priority-card.verdict-high .result-priority-title,
+.result-priority-card.verdict-high .result-priority-subtitle,
+.result-priority-card.verdict-high .result-priority-meta {
+  color: var(--red-text);
+}
+
+.result-priority-card.verdict-safe .result-priority-value,
+.result-priority-card.verdict-safe .result-priority-title,
+.result-priority-card.verdict-safe .result-priority-subtitle,
+.result-priority-card.verdict-safe .result-priority-meta {
+  color: var(--green-text);
 }
 
 .result-shell {
@@ -1313,6 +1384,7 @@ button:disabled {
 
 @media (max-width: 860px) {
   .input-row,
+  .result-priority-card,
   .result-shell,
   .result-grid,
   .tips-layout,

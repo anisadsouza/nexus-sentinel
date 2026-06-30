@@ -186,11 +186,24 @@ function renderResult(data) {
   const mlAnalysis = data.ml_analysis || {};
   const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
+  const primaryReason = scoreBreakdown[0]?.title || scoreBreakdown[0]?.reason || "No major warning signs were triggered.";
 
   result.innerHTML = `
+    <div class="result-priority-card ${verdictTone}">
+      <div class="result-priority-score">
+        <p class="section-kicker">Risk Percentage</p>
+        <p class="result-priority-value">${data.risk_score}%</p>
+      </div>
+      <div class="result-priority-copy">
+        <p class="result-priority-title">${humanVerdictTitle(data.classification)}</p>
+        <p class="result-priority-subtitle">${primaryReason}</p>
+        <p class="result-priority-meta">${data.url} · ${formatTimestamp(data.analyzed_at)}</p>
+      </div>
+    </div>
+
     <div class="result-shell">
       <div class="score-column">
-        <p class="section-kicker">Risk Score</p>
+        <p class="section-kicker">Risk Percentage</p>
         <div class="gauge-wrap">
           <svg class="score-gauge" viewBox="0 0 90 90" aria-hidden="true">
             <circle class="gauge-track" cx="45" cy="45" r="36"></circle>
@@ -216,7 +229,7 @@ function renderResult(data) {
           <div class="verdict-icon">${verdictIcon(data.classification)}</div>
           <div>
             <p class="verdict-title">${humanVerdictTitle(data.classification)}</p>
-            <p class="verdict-subtitle">${data.url}<br>${formatTimestamp(data.analyzed_at)}</p>
+            <p class="verdict-subtitle">${primaryReason}</p>
           </div>
         </div>
       </div>
