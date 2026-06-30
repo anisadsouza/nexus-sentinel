@@ -184,9 +184,9 @@ function renderResult(data) {
   const contentAnalysis = data.content_analysis || {};
   const redirectAnalysis = data.redirect_analysis || {};
   const mlAnalysis = data.ml_analysis || {};
-  const ringMetrics = buildRingMetrics(data.risk_score);
   const verdictTone = verdictToneClass(data.classification);
   const primaryReason = scoreBreakdown[0]?.title || scoreBreakdown[0]?.reason || "No major warning signs were triggered.";
+  const plainSummary = buildPlainSummary(data.classification, contentAnalysis, redirectAnalysis);
 
   result.innerHTML = `
     <div class="result-priority-card ${verdictTone}">
@@ -196,108 +196,82 @@ function renderResult(data) {
       </div>
       <div class="result-priority-copy">
         <p class="result-priority-title">${humanVerdictTitle(data.classification)}</p>
-        <p class="result-priority-subtitle">${primaryReason}</p>
+        <p class="result-priority-subtitle">${plainSummary}</p>
         <p class="result-priority-meta">${data.url} · ${formatTimestamp(data.analyzed_at)}</p>
-      </div>
-    </div>
-
-    <div class="result-shell">
-      <div class="score-column">
-        <p class="section-kicker">Risk Percentage</p>
-        <div class="gauge-wrap">
-          <svg class="score-gauge" viewBox="0 0 90 90" aria-hidden="true">
-            <circle class="gauge-track" cx="45" cy="45" r="36"></circle>
-            <circle
-              class="gauge-fill"
-              cx="45"
-              cy="45"
-              r="36"
-              stroke-dasharray="${ringMetrics.dashArray}"
-              stroke-dashoffset="${ringMetrics.dashOffset}"
-            ></circle>
-          </svg>
-          <div class="gauge-center">
-            <p class="gauge-score">${data.risk_score}</p>
-            <p class="gauge-total">/100</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="verdict-column">
-        <p class="section-kicker">Result</p>
-        <div class="verdict-card ${verdictTone}">
-          <div class="verdict-icon">${verdictIcon(data.classification)}</div>
-          <div>
-            <p class="verdict-title">${humanVerdictTitle(data.classification)}</p>
-            <p class="verdict-subtitle">${primaryReason}</p>
-          </div>
-        </div>
       </div>
     </div>
 
     <div class="result-grid">
       <section class="result-card">
-        <p class="section-kicker">Why it was flagged</p>
+        <p class="section-kicker">Main warning signs</p>
         <div class="factor-list">${buildRiskRows(scoreBreakdown)}</div>
       </section>
 
       <section class="result-card">
-        <p class="section-kicker">Good signs</p>
-        <div class="factor-list">${buildGoodSignalRows(features)}</div>
-      </section>
-    </div>
-
-    <div class="result-grid result-grid-secondary">
-      <section class="result-card">
-        <p class="section-kicker">Page check</p>
-        <div class="content-status-row">
-          <span class="risk-pill ${contentAnalysis.status === "fetched" ? "status-safe" : "status-suspicious"}">
-            ${sentenceCase(contentAnalysis.status || "unknown")}
-          </span>
-          <p class="content-note">${contentAnalysis.notes || "No page details available."}</p>
-        </div>
-        <div class="fact-grid">${buildContentRows(contentAnalysis)}</div>
-      </section>
-    </div>
-
-    <div class="result-grid result-grid-secondary">
-      <section class="result-card">
-        <p class="section-kicker">Destination check</p>
-        <div class="content-status-row">
-          <span class="risk-pill ${redirectAnalysis.status === "fetched" ? "status-safe" : "status-suspicious"}">
-            ${sentenceCase(redirectAnalysis.status || "unknown")}
-          </span>
-          <p class="content-note">${redirectAnalysis.notes || "No redirect details available."}</p>
-        </div>
-        <div class="fact-grid">${buildRedirectRows(redirectAnalysis)}</div>
-      </section>
-
-      <section class="result-card">
-        <p class="section-kicker">Model check</p>
-        <div class="ml-summary">${buildCompactMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
-      </section>
-    </div>
-
-    <div class="result-grid result-grid-secondary">
-      <section class="result-card">
-        <p class="section-kicker">What this means</p>
+        <p class="section-kicker">What to do</p>
         <div class="info-list">${buildTips(data, features)}</div>
       </section>
     </div>
 
-    <details class="advanced-details result-advanced-details">
-      <summary>More details</summary>
-      <div class="result-grid result-grid-secondary result-advanced-grid">
-        <section class="result-card">
-          <p class="section-kicker">Link details</p>
-          <div class="fact-grid">${buildFactRows(features)}</div>
-        </section>
-        <section class="result-card">
-          <p class="section-kicker">Full model details</p>
-          <div class="ml-summary">${buildMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
-        </section>
-      </div>
-    </details>
+    <div class="result-grid result-grid-secondary">
+      <section class="result-card">
+        <p class="section-kicker">Reassuring signs</p>
+        <div class="factor-list">${buildGoodSignalRows(features)}</div>
+      </section>
+      <section class="result-card">
+        <p class="section-kicker">Quick view</p>
+        <div class="fact-grid">${buildQuickViewRows(features, contentAnalysis, redirectAnalysis, mlAnalysis)}</div>
+      </section>
+    </div>
+
+    <div class="details-stack">
+      <details class="advanced-details">
+        <summary>Page snapshot</summary>
+        <div class="advanced-section-content">
+          <div class="content-status-row">
+            <span class="risk-pill ${contentAnalysis.status === "fetched" ? "status-safe" : "status-suspicious"}">
+              ${sentenceCase(contentAnalysis.status || "unknown")}
+            </span>
+            <p class="content-note">${contentAnalysis.notes || "No page details available."}</p>
+          </div>
+          <div class="fact-grid">${buildContentRows(contentAnalysis)}</div>
+        </div>
+      </details>
+
+      <details class="advanced-details">
+        <summary>Where the link leads</summary>
+        <div class="advanced-section-content">
+          <div class="content-status-row">
+            <span class="risk-pill ${redirectAnalysis.status === "fetched" ? "status-safe" : "status-suspicious"}">
+              ${sentenceCase(redirectAnalysis.status || "unknown")}
+            </span>
+            <p class="content-note">${redirectAnalysis.notes || "No redirect details available."}</p>
+          </div>
+          <div class="fact-grid">${buildRedirectRows(redirectAnalysis)}</div>
+        </div>
+      </details>
+
+      <details class="advanced-details">
+        <summary>Model opinion</summary>
+        <div class="advanced-section-content">
+          <div class="ml-summary">${buildCompactMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
+        </div>
+      </details>
+
+      <details class="advanced-details result-advanced-details">
+        <summary>Technical details</summary>
+        <div class="result-grid result-grid-secondary result-advanced-grid advanced-section-content">
+          <section class="result-card">
+            <p class="section-kicker">Link details</p>
+            <div class="fact-grid">${buildFactRows(features)}</div>
+          </section>
+          <section class="result-card">
+            <p class="section-kicker">Full model details</p>
+            <div class="ml-summary">${buildMlSummary(mlAnalysis, data.classification, data.risk_score)}</div>
+          </section>
+        </div>
+      </details>
+    </div>
 
     <div class="result-actions">
       <button id="download-single-report" type="button" class="secondary">Download result JSON</button>
@@ -308,6 +282,22 @@ function renderResult(data) {
   if (downloadButton) {
     downloadButton.addEventListener("click", downloadSingleResult);
   }
+}
+
+function buildPlainSummary(classification, contentAnalysis, redirectAnalysis) {
+  if (classification === "safe") {
+    return "This link looks okay based on the checks that were able to run.";
+  }
+  if (classification === "suspicious") {
+    if (contentAnalysis?.login_form_detected || contentAnalysis?.password_field_detected) {
+      return "Be careful with this link. It looks like it may ask for account details.";
+    }
+    return "Be careful with this link. It shows warning signs often seen in suspicious or misleading pages.";
+  }
+  if (redirectAnalysis?.cross_domain_redirect_detected) {
+    return "This link looks risky and jumps through other destinations, which is common in phishing.";
+  }
+  return "This link looks risky. Avoid entering passwords, payment details, or personal information.";
 }
 
 function renderBatchResults(data) {
@@ -1233,6 +1223,17 @@ function buildFactRows(features) {
         ? features.suspicious_keywords.join(", ")
         : "None",
     ],
+  ];
+
+  return facts.map(buildFactItem).join("");
+}
+
+function buildQuickViewRows(features, contentAnalysis, redirectAnalysis, mlAnalysis) {
+  const facts = [
+    ["Website name", features.hostname || "Unknown"],
+    ["Page snapshot", sentenceCase(contentAnalysis.status || "unknown")],
+    ["Destination check", sentenceCase(redirectAnalysis.status || "unknown")],
+    ["Model view", formatModelRisk(mlAnalysis)],
   ];
 
   return facts.map(buildFactItem).join("");

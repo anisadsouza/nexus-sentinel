@@ -489,66 +489,6 @@ button:disabled {
   color: var(--green-text);
 }
 
-.result-shell {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: start;
-  gap: 28px;
-}
-
-.score-column {
-  min-width: 120px;
-}
-
-.gauge-wrap {
-  position: relative;
-  width: 90px;
-  height: 90px;
-}
-
-.score-gauge {
-  width: 90px;
-  height: 90px;
-  transform: rotate(-90deg);
-}
-
-.gauge-track,
-.gauge-fill {
-  fill: none;
-  stroke-width: 7;
-}
-
-.gauge-track {
-  stroke: var(--border);
-}
-
-.gauge-fill {
-  stroke: var(--amber);
-  stroke-linecap: round;
-}
-
-.gauge-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 22px 0 18px;
-}
-
-.gauge-score {
-  margin-bottom: 0;
-  font-size: 30px;
-  font-weight: 700;
-  color: var(--amber);
-}
-
-.gauge-total {
-  margin-bottom: 0;
-  font-size: 12px;
-  color: color-mix(in srgb, var(--amber) 70%, transparent);
-}
-
 .verdict-card,
 .result-card,
 .batch-upload-card,
@@ -624,6 +564,18 @@ button:disabled {
 
 .result-grid-secondary {
   margin-top: 0;
+}
+
+.details-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.advanced-section-content {
+  margin-top: 14px;
+  display: grid;
+  gap: 14px;
 }
 
 .factor-list,
